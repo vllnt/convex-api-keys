@@ -1,0 +1,53 @@
+# @vllnt/convex-api-keys
+
+> Secure API key management as a Convex component. Create, validate, revoke, rotate, rate-limit, and track usage.
+
+## Installation
+
+```bash
+npm install @vllnt/convex-api-keys
+```
+
+Register in `convex/convex.config.ts`:
+
+```ts
+import { defineApp } from "convex/server";
+import apiKeys from "@vllnt/convex-api-keys/convex.config";
+const app = defineApp();
+app.use(apiKeys);
+export default app;
+```
+
+## Key Concepts
+
+- **Key format**: `{prefix}_{type}_{env}_{random8}_{secret64}` — e.g. `myapp_secret_live_a1b2c3d4_<hex>`
+- **Types**: `secret` (server-side) and `publishable` (client-safe)
+- **Storage**: SHA-256 hashed, constant-time comparison, prefix-indexed O(1) lookup
+- **Lifecycle**: active → disabled (reversible) | revoked | rotating → expired | exhausted
+- **Multi-tenant**: all queries scoped by `ownerId`
+- **Rate limiting**: per-key via `@convex-dev/rate-limiter`
+- **Finite-use**: optional `remaining` counter with atomic decrement
+
+## API
+
+| Method | Ctx | Description |
+|--------|-----|-------------|
+| `create(ctx, options)` | mutation | Create a new API key |
+| `validate(ctx, { key })` | mutation | Validate and track usage |
+| `revoke(ctx, { keyId })` | mutation | Permanently revoke |
+| `revokeByTag(ctx, { ownerId, tag })` | mutation | Bulk revoke by tag |
+| `rotate(ctx, { keyId, gracePeriodMs? })` | mutation | Rotate with grace period |
+| `list(ctx, { ownerId, env?, status? })` | query | List keys (no secrets) |
+| `listByTag(ctx, { ownerId, tag })` | query | Filter by tag |
+| `update(ctx, { keyId, ... })` | mutation | Update metadata in-place |
+| `disable(ctx, { keyId })` | mutation | Temporarily disable |
+| `enable(ctx, { keyId })` | mutation | Re-enable disabled key |
+| `getUsage(ctx, { keyId, period? })` | query | Usage analytics |
+
+## Source
+
+- Client: `src/client/index.ts`, `src/client/types.ts`
+- Component: `src/component/public.ts`, `src/component/schema.ts`
+- Shared: `src/shared.ts`
+- Test helpers: `src/test.ts`
+- Full source: [llms-full.txt](./llms-full.txt)
