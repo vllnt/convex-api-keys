@@ -15,10 +15,6 @@
       "types": "./dist/client/index.d.ts",
       "default": "./dist/client/index.js"
     },
-    "./types": {
-      "types": "./dist/client/types.d.ts",
-      "default": "./dist/client/types.js"
-    },
     "./test": "./src/test.ts",
     "./_generated/component.js": {
       "types": "./dist/component/_generated/component.d.ts"
@@ -47,17 +43,18 @@
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
     "release": "npm version patch && npm publish && git push --follow-tags"
   },
-  "dependencies": {
+  "peerDependencies": {
+    "convex": "^1.33.0",
+    "@convex-dev/rate-limiter": "^0.3.0",
+    "@convex-dev/sharded-counter": "^0.2.0",
+    "@convex-dev/aggregate": "^0.2.0",
+    "@convex-dev/crons": "^0.2.0"
+  },
+  "devDependencies": {
     "@convex-dev/aggregate": "^0.2.0",
     "@convex-dev/crons": "^0.2.0",
     "@convex-dev/rate-limiter": "^0.3.0",
     "@convex-dev/sharded-counter": "^0.2.0",
-    "@vllnt/logger": "^0.1.2"
-  },
-  "peerDependencies": {
-    "convex": "^1.33.0"
-  },
-  "devDependencies": {
     "@edge-runtime/vm": "^4.0.0",
     "@vllnt/eslint-config": "^1.0.0",
     "@vllnt/typescript": "^1.0.0",

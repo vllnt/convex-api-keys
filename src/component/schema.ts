@@ -29,9 +29,8 @@ export default defineSchema({
     revokedAt: v.optional(v.number()),
   })
     .index("by_lookup_prefix", ["lookupPrefix"])
-    .index("by_owner", ["ownerId", "status"])
-    .index("by_owner_env", ["ownerId", "env", "status"])
-    .index("by_owner_status", ["ownerId", "status"]),
+    .index("by_owner_status", ["ownerId", "status"])
+    .index("by_owner_env", ["ownerId", "env", "status"]),
 
   apiKeyEvents: defineTable({
     keyId: v.id("apiKeys"),
