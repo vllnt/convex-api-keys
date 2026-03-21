@@ -4,6 +4,7 @@
   "description": "Convex component for secure API key management — create, validate, revoke, rotate, rate-limit, track usage",
   "license": "Apache-2.0",
   "type": "module",
+  "packageManager": "pnpm@9.15.4",
   "files": [
     "dist",
     "src"
@@ -35,13 +36,14 @@
   "module": "./dist/client/index.js",
   "scripts": {
     "build": "tsc --project ./tsconfig.build.json",
-    "build:codegen": "npx convex codegen --component-dir ./src/component && npm run build",
-    "build:clean": "rm -rf dist *.tsbuildinfo && npm run build:codegen",
+    "build:codegen": "pnpm convex codegen --component-dir ./src/component && pnpm build",
+    "build:clean": "rm -rf dist *.tsbuildinfo && pnpm build:codegen",
     "typecheck": "tsc --noEmit",
+    "typecheck:ci": "tsc --noEmit --project tsconfig.ci.json",
     "lint": "eslint .",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "preversion": "npm ci && npm run build:clean && npm run test && npm run typecheck",
+    "preversion": "pnpm install --frozen-lockfile && pnpm build:clean && pnpm test && pnpm typecheck",
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
     "release": "npm version patch && npm publish && git push --follow-tags"
   },
