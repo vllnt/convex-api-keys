@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { mutation, query, action, internalMutation } from "./_generated/server.js";
-import { internal } from "./_generated/api.js";
-import { createConvexLogger } from "@vllnt/logger/convex";
+import { mutation, query } from "./_generated/server.js";
+import { components } from "./_generated/api.js";
+import { RateLimiter, MINUTE, HOUR } from "@convex-dev/rate-limiter";
+import { ShardedCounter } from "@convex-dev/sharded-counter";
 import {
   KEY_STATUS,
   KEY_TYPE,
@@ -12,9 +13,17 @@ import {
   validateTags,
   KEY_PREFIX_SEPARATOR,
 } from "../shared.js";
+import { createLogger } from "../log.js";
 import type { KeyStatus } from "../shared.js";
 
-const log = createConvexLogger("api-keys");
+const log = createLogger("api-keys");
+
+const rateLimiter = new RateLimiter(components.rateLimiter, {
+  createKey: { kind: "fixed window", rate: 100, period: HOUR },
+  validateKey: { kind: "token bucket", rate: 1000, period: MINUTE },
+});
+
+const counter = new ShardedCounter(components.shardedCounter);
 
 export const create = mutation({
   args: {
@@ -46,6 +55,11 @@ export const create = mutation({
     if (args.tags) {
       validateTags(args.tags);
     }
+
+    await rateLimiter.limit(ctx, "createKey", {
+      key: args.ownerId,
+      throws: true,
+    });
 
     const type = args.type ?? "secret";
     const env = args.env ?? "live";
@@ -223,6 +237,22 @@ export const validate = mutation({
     } else {
       await ctx.db.patch(matchedKey._id, { lastUsedAt: now });
     }
+
+    const { ok, retryAfter } = await rateLimiter.limit(ctx, "validateKey", {
+      key: matchedKey._id,
+      throws: false,
+    });
+    if (!ok) {
+      await ctx.db.insert("apiKeyEvents", {
+        keyId: matchedKey._id,
+        ownerId: matchedKey.ownerId,
+        eventType: "key.rate_limited",
+        timestamp: now,
+      });
+      return { valid: false as const, reason: "rate_limited", retryAfter };
+    }
+
+    await counter.add(ctx, matchedKey._id, 1);
 
     await ctx.db.insert("apiKeyEvents", {
       keyId: matchedKey._id,
@@ -411,7 +441,7 @@ export const list = query({
     } else {
       keysQuery = ctx.db
         .query("apiKeys")
-        .withIndex("by_owner", (q) => q.eq("ownerId", ownerId));
+        .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId));
     }
 
     const keys = await keysQuery.collect();
@@ -459,7 +489,7 @@ export const listByTag = query({
   handler: async (ctx, { ownerId, tag }) => {
     const keys = await ctx.db
       .query("apiKeys")
-      .withIndex("by_owner", (q) => q.eq("ownerId", ownerId))
+      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId))
       .collect();
 
     return keys
@@ -595,19 +625,18 @@ export const getUsage = query({
       throw new Error("key not found");
     }
 
-    let total = 0;
-    const eventsQuery = ctx.db
-      .query("apiKeyEvents")
-      .withIndex("by_key", (q) => {
-        const base = q.eq("keyId", keyId);
-        if (period) {
-          return base.gte("timestamp", period.start).lte("timestamp", period.end);
-        }
-        return base;
-      });
-
-    const events = await eventsQuery.collect();
-    total = events.filter((e) => e.eventType === "key.validated").length;
+    let total: number;
+    if (period) {
+      const events = await ctx.db
+        .query("apiKeyEvents")
+        .withIndex("by_key", (q) =>
+          q.eq("keyId", keyId).gte("timestamp", period.start).lte("timestamp", period.end),
+        )
+        .collect();
+      total = events.filter((e) => e.eventType === "key.validated").length;
+    } else {
+      total = await counter.count(ctx, keyId);
+    }
 
     return {
       total,

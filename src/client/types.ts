@@ -2,21 +2,6 @@ import type { KeyType, KeyStatus, EventType } from "../shared.js";
 
 export type { KeyType, KeyStatus, EventType };
 
-export interface RateLimitConfig {
-  kind: "token bucket" | "fixed window";
-  rate: number;
-  period: number;
-  capacity?: number;
-  shards?: number;
-}
-
-export interface ApiKeyConfig {
-  prefix?: string;
-  defaultType?: KeyType;
-  rateLimit?: Record<string, RateLimitConfig>;
-  onEvent?: unknown;
-}
-
 export interface CreateKeyOptions {
   name: string;
   ownerId: string;
