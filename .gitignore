@@ -38,5 +38,5 @@ dist/
 skills-lock.json
 skills/
 
-# Convex example generated
-example/convex/_generated/
+# Convex example generated (types only, JS stubs committed for tests)
+example/convex/_generated/ai/
