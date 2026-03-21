@@ -35,8 +35,6 @@ dist/
 .vibe/
 .windsurf/
 .zencoder/
-AGENTS.md
-CLAUDE.md
 skills-lock.json
 skills/
 
