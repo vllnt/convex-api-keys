@@ -63,6 +63,17 @@ export const revokeKey = mutation({
   },
 });
 
+export const rotateKey = mutation({
+  args: {
+    keyId: v.string(),
+    gracePeriodMs: v.optional(v.number()),
+  },
+  returns: v.any(),
+  handler: async (ctx, { keyId, gracePeriodMs }) => {
+    return await apiKeys.rotate(ctx, { keyId, gracePeriodMs });
+  },
+});
+
 export const createOneTimeToken = mutation({
   args: {
     ownerId: v.string(),

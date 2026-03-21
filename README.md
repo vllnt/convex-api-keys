@@ -1,3 +1,7 @@
+[![npm version](https://img.shields.io/npm/v/@vllnt/convex-api-keys)](https://www.npmjs.com/package/@vllnt/convex-api-keys)
+[![CI](https://github.com/vllnt/convex-api-keys/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-api-keys/actions/workflows/ci.yml)
+[![License](https://img.shields.io/npm/l/@vllnt/convex-api-keys)](./LICENSE)
+
 # @vllnt/convex-api-keys
 
 Secure API key management as a [Convex component](https://docs.convex.dev/components). Create, validate, revoke, rotate, rate-limit, and track usage — all backed by battle-tested `@convex-dev/*` ecosystem components.
@@ -213,6 +217,10 @@ import { register } from "@vllnt/convex-api-keys/test";
 const t = convexTest(schema, modules);
 register(t, "apiKeys");
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR guidelines.
 
 ## License
 

@@ -111,15 +111,11 @@ export class ApiKeys {
     const lookupPrefix = generateRandomHex(8);
     const secretHex = generateRandomHex(64);
 
-    const rawKey = [this.prefix, "secret", "live", lookupPrefix, secretHex].join("_");
-    const hash = await sha256Hex(rawKey);
-
     return await ctx.runMutation(this.component.public.rotate, {
       keyId: args.keyId,
       gracePeriodMs: args.gracePeriodMs,
       lookupPrefix,
       secretHex,
-      hash,
     }) as RotateResult;
   }
 

@@ -337,7 +337,6 @@ export const rotate = mutation({
     gracePeriodMs: v.optional(v.number()),
     lookupPrefix: v.string(),
     secretHex: v.string(),
-    hash: v.string(),
   },
   returns: v.object({
     newKeyId: v.id("apiKeys"),
@@ -363,8 +362,17 @@ export const rotate = mutation({
     });
 
     const typeShort = oldKey.type === "publishable" ? "pub" : "secret";
+    const rawKey = [
+      oldKey.keyPrefix,
+      typeShort,
+      oldKey.env,
+      args.lookupPrefix,
+      args.secretHex,
+    ].join(KEY_PREFIX_SEPARATOR);
+    const hash = await sha256Hex(rawKey);
+
     const newKeyId = await ctx.db.insert("apiKeys", {
-      hash: args.hash,
+      hash,
       lookupPrefix: args.lookupPrefix,
       keyPrefix: oldKey.keyPrefix,
       type: oldKey.type,
@@ -379,14 +387,6 @@ export const rotate = mutation({
       expiresAt: oldKey.expiresAt,
       rotatedFromId: args.keyId,
     });
-
-    const rawKey = [
-      oldKey.keyPrefix,
-      typeShort,
-      oldKey.env,
-      args.lookupPrefix,
-      args.secretHex,
-    ].join(KEY_PREFIX_SEPARATOR);
 
     await ctx.db.insert("apiKeyEvents", {
       keyId: args.keyId,
