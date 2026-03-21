@@ -1,6 +1,9 @@
 import type { GenericActionCtx, GenericMutationCtx, GenericQueryCtx, GenericDataModel } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
+import { createConvexLogger } from "@vllnt/logger/convex";
 import { sha256Hex } from "../shared.js";
+
+const log = createConvexLogger("api-keys:client");
 import type {
   ApiKeyConfig,
   CreateKeyOptions,
