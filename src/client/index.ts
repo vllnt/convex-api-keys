@@ -1,11 +1,7 @@
-import type { GenericActionCtx, GenericMutationCtx, GenericQueryCtx, GenericDataModel } from "convex/server";
+import type { GenericMutationCtx, GenericQueryCtx, GenericDataModel } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
-import { createConvexLogger } from "@vllnt/logger/convex";
 import { sha256Hex } from "../shared.js";
-
-const log = createConvexLogger("api-keys:client");
 import type {
-  ApiKeyConfig,
   CreateKeyOptions,
   CreateKeyResult,
   ValidationResult,
@@ -16,11 +12,24 @@ import type {
   KeyStatus,
 } from "./types.js";
 
-export type { ApiKeyConfig, CreateKeyOptions, CreateKeyResult, ValidationResult, KeyMetadata, UsageStats, RotateResult, KeyType, KeyStatus };
+export type {
+  CreateKeyOptions,
+  CreateKeyResult,
+  ValidationResult,
+  KeyMetadata,
+  UsageStats,
+  RotateResult,
+  KeyType,
+  KeyStatus,
+};
 
-type RunMutationCtx = Pick<GenericMutationCtx<GenericDataModel>, "runMutation">;
-type RunQueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
-type RunActionCtx = Pick<GenericActionCtx<GenericDataModel>, "runAction">;
+export type RunMutationCtx = Pick<GenericMutationCtx<GenericDataModel>, "runMutation">;
+export type RunQueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
+
+export interface ApiKeysConfig {
+  prefix?: string;
+  defaultType?: KeyType;
+}
 
 function generateRandomHex(length: number): string {
   const bytes = new Uint8Array(length / 2);
@@ -31,27 +40,28 @@ function generateRandomHex(length: number): string {
 }
 
 export class ApiKeys {
-  private component: ComponentApi;
-  private config: ApiKeyConfig;
+  public component: ComponentApi;
+  private prefix: string;
+  private defaultType: KeyType;
 
-  constructor(component: ComponentApi, config?: ApiKeyConfig) {
+  constructor(component: ComponentApi, config?: ApiKeysConfig) {
     this.component = component;
-    this.config = config ?? {};
+    this.prefix = config?.prefix ?? "vk";
+    this.defaultType = config?.defaultType ?? "secret";
   }
 
   async create(
     ctx: RunMutationCtx,
     options: CreateKeyOptions,
   ): Promise<CreateKeyResult> {
-    const prefix = this.config.prefix ?? "vk";
-    const type = options.type ?? this.config.defaultType ?? "secret";
+    const type = options.type ?? this.defaultType;
     const typeShort = type === "publishable" ? "pub" : "secret";
     const env = options.env ?? "live";
 
     const lookupPrefix = generateRandomHex(8);
     const secretHex = generateRandomHex(64);
 
-    const rawKey = [prefix, typeShort, env, lookupPrefix, secretHex].join("_");
+    const rawKey = [this.prefix, typeShort, env, lookupPrefix, secretHex].join("_");
     const hash = await sha256Hex(rawKey);
 
     const result = await ctx.runMutation(this.component.public.create, {
@@ -64,7 +74,7 @@ export class ApiKeys {
       metadata: options.metadata,
       remaining: options.remaining,
       expiresAt: options.expiresAt,
-      keyPrefix: prefix,
+      keyPrefix: this.prefix,
       lookupPrefix,
       secretHex,
       hash,
@@ -77,19 +87,14 @@ export class ApiKeys {
     ctx: RunMutationCtx,
     args: { key: string },
   ): Promise<ValidationResult> {
-    const result = await ctx.runMutation(this.component.public.validate, {
-      key: args.key,
-    });
-    return result as ValidationResult;
+    return await ctx.runMutation(
+      this.component.public.validate,
+      { key: args.key },
+    ) as ValidationResult;
   }
 
-  async revoke(
-    ctx: RunMutationCtx,
-    args: { keyId: string },
-  ): Promise<void> {
-    await ctx.runMutation(this.component.public.revoke, {
-      keyId: args.keyId as never,
-    });
+  async revoke(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
+    await ctx.runMutation(this.component.public.revoke, { keyId: args.keyId });
   }
 
   async revokeByTag(
@@ -106,33 +111,36 @@ export class ApiKeys {
     const lookupPrefix = generateRandomHex(8);
     const secretHex = generateRandomHex(64);
 
-    const oldKey = await ctx.runMutation(this.component.public.rotate, {
-      keyId: args.keyId as never,
+    const rawKey = [this.prefix, "secret", "live", lookupPrefix, secretHex].join("_");
+    const hash = await sha256Hex(rawKey);
+
+    return await ctx.runMutation(this.component.public.rotate, {
+      keyId: args.keyId,
       gracePeriodMs: args.gracePeriodMs,
       lookupPrefix,
       secretHex,
-      hash: await sha256Hex(
-        [this.config.prefix ?? "vk", "secret", "live", lookupPrefix, secretHex].join("_"),
-      ),
-    }) as { newKeyId: string; newKey: string; oldKeyExpiresAt: number };
-
-    return oldKey;
+      hash,
+    }) as RotateResult;
   }
 
   async list(
     ctx: RunQueryCtx,
     args: { ownerId: string; env?: string; status?: KeyStatus },
   ): Promise<KeyMetadata[]> {
-    const result = await ctx.runQuery(this.component.public.list, args);
-    return result as unknown as KeyMetadata[];
+    return await ctx.runQuery(
+      this.component.public.list,
+      args,
+    ) as unknown as KeyMetadata[];
   }
 
   async listByTag(
     ctx: RunQueryCtx,
     args: { ownerId: string; tag: string },
   ): Promise<KeyMetadata[]> {
-    const result = await ctx.runQuery(this.component.public.listByTag, args);
-    return result as unknown as KeyMetadata[];
+    return await ctx.runQuery(
+      this.component.public.listByTag,
+      args,
+    ) as unknown as KeyMetadata[];
   }
 
   async update(
@@ -146,7 +154,7 @@ export class ApiKeys {
     },
   ): Promise<void> {
     await ctx.runMutation(this.component.public.update, {
-      keyId: args.keyId as never,
+      keyId: args.keyId,
       name: args.name,
       scopes: args.scopes,
       tags: args.tags,
@@ -155,26 +163,21 @@ export class ApiKeys {
   }
 
   async disable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.public.disable, {
-      keyId: args.keyId as never,
-    });
+    await ctx.runMutation(this.component.public.disable, { keyId: args.keyId });
   }
 
   async enable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.public.enable, {
-      keyId: args.keyId as never,
-    });
+    await ctx.runMutation(this.component.public.enable, { keyId: args.keyId });
   }
 
   async getUsage(
     ctx: RunQueryCtx,
     args: { keyId: string; period?: { start: number; end: number } },
   ): Promise<UsageStats> {
-    const result = await ctx.runQuery(this.component.public.getUsage, {
-      keyId: args.keyId as never,
+    return await ctx.runQuery(this.component.public.getUsage, {
+      keyId: args.keyId,
       period: args.period,
-    });
-    return result as UsageStats;
+    }) as UsageStats;
   }
 
   async configure(
