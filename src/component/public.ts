@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, action, internalMutation } from "./_generated/server.js";
 import { internal } from "./_generated/api.js";
+import { createConvexLogger } from "@vllnt/logger/convex";
 import {
   KEY_STATUS,
   KEY_TYPE,
@@ -12,6 +13,8 @@ import {
   KEY_PREFIX_SEPARATOR,
 } from "../shared.js";
 import type { KeyStatus } from "../shared.js";
+
+const log = createConvexLogger("api-keys");
 
 export const create = mutation({
   args: {
@@ -76,6 +79,7 @@ export const create = mutation({
       KEY_PREFIX_SEPARATOR,
     );
 
+    log.info("key created", { keyId, ownerId: args.ownerId, type, env });
     return { keyId, key: rawKey };
   },
 });
@@ -261,6 +265,7 @@ export const revoke = mutation({
       eventType: "key.revoked",
       timestamp: Date.now(),
     });
+    log.info("key revoked", { keyId, ownerId: key.ownerId });
     return null;
   },
 });
