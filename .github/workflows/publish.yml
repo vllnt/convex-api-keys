@@ -86,7 +86,7 @@ jobs:
           SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
           CANARY_VERSION="${BASE_VERSION}-canary.${SHORT_SHA}"
           npm version "$CANARY_VERSION" --no-git-tag-version --ignore-scripts
-          npm publish --tag canary --provenance --access public
+          npm publish --tag canary --provenance --access public --ignore-scripts
 
   release:
     name: Publish Release
@@ -174,7 +174,7 @@ jobs:
         run: |
           sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
           unset NODE_AUTH_TOKEN
-          npm publish --tag latest --provenance --access public
+          npm publish --tag latest --provenance --access public --ignore-scripts
 
       - name: Create GitHub Release
         env:
