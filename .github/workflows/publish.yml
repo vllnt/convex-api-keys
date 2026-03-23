@@ -85,7 +85,7 @@ jobs:
           BASE_VERSION=$(node -p "require('./package.json').version")
           SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
           CANARY_VERSION="${BASE_VERSION}-canary.${SHORT_SHA}"
-          npm version "$CANARY_VERSION" --no-git-tag-version
+          npm version "$CANARY_VERSION" --no-git-tag-version --ignore-scripts
           npm publish --tag canary --provenance --access public
 
   release:
@@ -117,7 +117,7 @@ jobs:
       - name: Bump version
         id: version
         run: |
-          npm version ${{ inputs.bump }} --no-git-tag-version
+          npm version ${{ inputs.bump }} --no-git-tag-version --ignore-scripts
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
