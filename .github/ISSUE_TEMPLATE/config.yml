@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Support Questions
-    url: https://discord.gg/convex
-    about: For usage questions, ask on the Convex Discord.
+  - name: Discord
+    url: https://discord.gg/V9yss7VfVT
+    about: Ask questions and get help on Discord.
+  - name: Website
+    url: https://bntvllnt.com
+    about: Visit bntvllnt.com for more info.
+  - name: X / Twitter
+    url: https://x.com/bntvllnt
+    about: Follow @bntvllnt for updates.
