@@ -1,14 +1,13 @@
 name: Publish
 
 on:
-  # TODO: uncomment after first manual publish to npm
-  # push:
-  #   branches: [main]
-  #   paths:
-  #     - "src/**"
-  #     - "package.json"
-  #     - "pnpm-lock.yaml"
-  #     - ".github/workflows/publish.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/publish.yml"
   workflow_dispatch:
     inputs:
       bump:
