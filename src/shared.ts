@@ -111,6 +111,7 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return result === 0;
 }
 
+/** Compute SHA-256 hash of input, returned as lowercase hex string. */
 export async function sha256Hex(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
