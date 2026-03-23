@@ -64,7 +64,7 @@ export class ApiKeys {
     const rawKey = [this.prefix, typeShort, env, lookupPrefix, secretHex].join("_");
     const hash = await sha256Hex(rawKey);
 
-    const result = await ctx.runMutation(this.component.public.create, {
+    const result = await ctx.runMutation(this.component.mutations.create, {
       name: options.name,
       ownerId: options.ownerId,
       type,
@@ -88,20 +88,20 @@ export class ApiKeys {
     args: { key: string },
   ): Promise<ValidationResult> {
     return await ctx.runMutation(
-      this.component.public.validate,
+      this.component.mutations.validate,
       { key: args.key },
     ) as ValidationResult;
   }
 
   async revoke(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.public.revoke, { keyId: args.keyId });
+    await ctx.runMutation(this.component.mutations.revoke, { keyId: args.keyId });
   }
 
   async revokeByTag(
     ctx: RunMutationCtx,
     args: { ownerId: string; tag: string },
   ): Promise<{ revokedCount: number }> {
-    return await ctx.runMutation(this.component.public.revokeByTag, args);
+    return await ctx.runMutation(this.component.mutations.revokeByTag, args);
   }
 
   async rotate(
@@ -111,7 +111,7 @@ export class ApiKeys {
     const lookupPrefix = generateRandomHex(8);
     const secretHex = generateRandomHex(64);
 
-    return await ctx.runMutation(this.component.public.rotate, {
+    return await ctx.runMutation(this.component.mutations.rotate, {
       keyId: args.keyId,
       gracePeriodMs: args.gracePeriodMs,
       lookupPrefix,
@@ -124,7 +124,7 @@ export class ApiKeys {
     args: { ownerId: string; env?: string; status?: KeyStatus },
   ): Promise<KeyMetadata[]> {
     return await ctx.runQuery(
-      this.component.public.list,
+      this.component.queries.list,
       args,
     ) as unknown as KeyMetadata[];
   }
@@ -134,7 +134,7 @@ export class ApiKeys {
     args: { ownerId: string; tag: string },
   ): Promise<KeyMetadata[]> {
     return await ctx.runQuery(
-      this.component.public.listByTag,
+      this.component.queries.listByTag,
       args,
     ) as unknown as KeyMetadata[];
   }
@@ -149,7 +149,7 @@ export class ApiKeys {
       metadata?: Record<string, unknown>;
     },
   ): Promise<void> {
-    await ctx.runMutation(this.component.public.update, {
+    await ctx.runMutation(this.component.mutations.update, {
       keyId: args.keyId,
       name: args.name,
       scopes: args.scopes,
@@ -159,18 +159,18 @@ export class ApiKeys {
   }
 
   async disable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.public.disable, { keyId: args.keyId });
+    await ctx.runMutation(this.component.mutations.disable, { keyId: args.keyId });
   }
 
   async enable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.public.enable, { keyId: args.keyId });
+    await ctx.runMutation(this.component.mutations.enable, { keyId: args.keyId });
   }
 
   async getUsage(
     ctx: RunQueryCtx,
     args: { keyId: string; period?: { start: number; end: number } },
   ): Promise<UsageStats> {
-    return await ctx.runQuery(this.component.public.getUsage, {
+    return await ctx.runQuery(this.component.queries.getUsage, {
       keyId: args.keyId,
       period: args.period,
     }) as UsageStats;
@@ -180,6 +180,6 @@ export class ApiKeys {
     ctx: RunMutationCtx,
     args: { cleanupIntervalMs?: number; defaultExpiryMs?: number },
   ): Promise<void> {
-    await ctx.runMutation(this.component.public.configure, args);
+    await ctx.runMutation(this.component.mutations.configure, args);
   }
 }
