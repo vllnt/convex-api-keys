@@ -1,26 +1,21 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { KEY_TYPE, KEY_STATUS } from "../shared.js";
+import { jsonValue } from "./validators.js";
 
 export default defineSchema({
   apiKeys: defineTable({
     hash: v.string(),
     lookupPrefix: v.string(),
     keyPrefix: v.string(),
-    type: v.union(v.literal("secret"), v.literal("publishable")),
+    type: KEY_TYPE,
     env: v.string(),
     ownerId: v.string(),
     name: v.string(),
     scopes: v.array(v.string()),
     tags: v.array(v.string()),
-    status: v.union(
-      v.literal("active"),
-      v.literal("disabled"),
-      v.literal("revoked"),
-      v.literal("rotating"),
-      v.literal("expired"),
-      v.literal("exhausted"),
-    ),
-    metadata: v.optional(v.any()),
+    status: KEY_STATUS,
+    metadata: v.optional(jsonValue),
     remaining: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     gracePeriodEnd: v.optional(v.number()),
@@ -37,7 +32,7 @@ export default defineSchema({
     ownerId: v.string(),
     eventType: v.string(),
     reason: v.optional(v.string()),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(jsonValue),
     timestamp: v.number(),
   })
     .index("by_key", ["keyId", "timestamp"])

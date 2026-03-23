@@ -21,14 +21,18 @@ src/
 │   ├── types.ts           # Public TypeScript interfaces
 │   └── index.ts           # ApiKeys client class (consumer-facing API)
 └── component/
+    ├── mutations.ts        # Mutations (create, validate, revoke, rotate, update, disable, enable, configure)
+    ├── queries.ts          # Queries (list, listByTag, getUsage)
+    ├── validators.ts       # Shared validators (jsonValue alias for v.any())
     ├── schema.ts           # Convex schema (apiKeys, apiKeyEvents, config tables)
-    ├── public.ts           # Mutations/queries (create, validate, rotate, revoke, etc.)
     └── convex.config.ts    # Component config (rate-limiter, sharded-counter, aggregate, crons)
 ```
 
 ## Key Design Decisions
 
-- **Hash computed server-side**: `rotate()` computes the SHA-256 hash inside the component mutation (not the client) to ensure the hash always matches the old key's actual type/env.
+- **Hash computed server-side**: `rotate()` in `mutations.ts` computes the SHA-256 hash inside the component mutation (not the client) to ensure the hash always matches the old key's actual type/env.
+- **Namespace separation**: Mutations in `mutations.ts`, queries in `queries.ts` — enforced by `@vllnt/eslint-config/convex`.
+- **No bare `v.any()`**: All uses aliased as `jsonValue` in `validators.ts`.
 - **Prefix-indexed lookup**: Keys use an 8-char `lookupPrefix` for O(1) candidate lookup, then constant-time hash comparison.
 - **No raw keys stored**: Only SHA-256 hashes persist. Raw keys are returned once at creation.
 

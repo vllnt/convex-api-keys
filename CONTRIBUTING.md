@@ -24,8 +24,10 @@ pnpm test:watch    # watch mode
 ## Code Style
 
 - Prettier + ESLint (run `pnpm lint` before submitting)
+- `@vllnt/eslint-config/convex` enforces: namespace separation, snake_case filenames, no bare `v.any()`, require returns validators, no N+1 queries
 - No `any` — use `unknown` + type guards
 - Explicit return types on public APIs
+- Mutations in `mutations.ts`, queries in `queries.ts`, validators in `validators.ts`
 
 ## Pull Requests
 

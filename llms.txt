@@ -47,7 +47,7 @@ export default app;
 ## Source
 
 - Client: `src/client/index.ts`, `src/client/types.ts`
-- Component: `src/component/public.ts`, `src/component/schema.ts`
+- Component: `src/component/mutations.ts`, `src/component/queries.ts`, `src/component/schema.ts`, `src/component/validators.ts`
 - Shared: `src/shared.ts`
 - Test helpers: `src/test.ts`
 - Full source: [llms-full.txt](./llms-full.txt)

@@ -23,7 +23,7 @@ import type { FunctionReference } from "convex/server";
  */
 export type ComponentApi<Name extends string | undefined = string | undefined> =
   {
-    public: {
+    mutations: {
       configure: FunctionReference<
         "mutation",
         "internal",
@@ -66,6 +66,65 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         null,
         Name
       >;
+      revoke: FunctionReference<
+        "mutation",
+        "internal",
+        { keyId: string },
+        null,
+        Name
+      >;
+      revokeByTag: FunctionReference<
+        "mutation",
+        "internal",
+        { ownerId: string; tag: string },
+        { revokedCount: number },
+        Name
+      >;
+      rotate: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          gracePeriodMs?: number;
+          keyId: string;
+          lookupPrefix: string;
+          secretHex: string;
+        },
+        { newKey: string; newKeyId: string; oldKeyExpiresAt: number },
+        Name
+      >;
+      update: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          keyId: string;
+          metadata?: any;
+          name?: string;
+          scopes?: Array<string>;
+          tags?: Array<string>;
+        },
+        null,
+        Name
+      >;
+      validate: FunctionReference<
+        "mutation",
+        "internal",
+        { key: string },
+        | {
+            env: string;
+            keyId: string;
+            metadata?: any;
+            ownerId: string;
+            remaining?: number;
+            scopes: Array<string>;
+            tags: Array<string>;
+            type: "secret" | "publishable";
+            valid: true;
+          }
+        | { reason: string; retryAfter?: number; valid: false },
+        Name
+      >;
+    };
+    queries: {
       getUsage: FunctionReference<
         "query",
         "internal",
@@ -135,63 +194,6 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           tags: Array<string>;
           type: "secret" | "publishable";
         }>,
-        Name
-      >;
-      revoke: FunctionReference<
-        "mutation",
-        "internal",
-        { keyId: string },
-        null,
-        Name
-      >;
-      revokeByTag: FunctionReference<
-        "mutation",
-        "internal",
-        { ownerId: string; tag: string },
-        { revokedCount: number },
-        Name
-      >;
-      rotate: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          gracePeriodMs?: number;
-          keyId: string;
-          lookupPrefix: string;
-          secretHex: string;
-        },
-        { newKey: string; newKeyId: string; oldKeyExpiresAt: number },
-        Name
-      >;
-      update: FunctionReference<
-        "mutation",
-        "internal",
-        {
-          keyId: string;
-          metadata?: any;
-          name?: string;
-          scopes?: Array<string>;
-          tags?: Array<string>;
-        },
-        null,
-        Name
-      >;
-      validate: FunctionReference<
-        "mutation",
-        "internal",
-        { key: string },
-        | {
-            env: string;
-            keyId: string;
-            metadata?: any;
-            ownerId: string;
-            remaining?: number;
-            scopes: Array<string>;
-            tags: Array<string>;
-            type: "secret" | "publishable";
-            valid: true;
-          }
-        | { reason: string; retryAfter?: number; valid: false },
         Name
       >;
     };

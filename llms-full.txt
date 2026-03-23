@@ -234,6 +234,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR 
 
 Apache-2.0
 
+
 ---
 
 ## src/shared.ts
@@ -361,6 +362,7 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 ```
 
+
 ---
 
 ## src/client/types.ts
@@ -445,6 +447,7 @@ export interface KeyEvent {
 }
 ```
 
+
 ---
 
 ## src/client/index.ts
@@ -516,7 +519,7 @@ export class ApiKeys {
     const rawKey = [this.prefix, typeShort, env, lookupPrefix, secretHex].join("_");
     const hash = await sha256Hex(rawKey);
 
-    const result = await ctx.runMutation(this.component.public.create, {
+    const result = await ctx.runMutation(this.component.mutations.create, {
       name: options.name,
       ownerId: options.ownerId,
       type,
@@ -540,20 +543,20 @@ export class ApiKeys {
     args: { key: string },
   ): Promise<ValidationResult> {
     return await ctx.runMutation(
-      this.component.public.validate,
+      this.component.mutations.validate,
       { key: args.key },
     ) as ValidationResult;
   }
 
   async revoke(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.public.revoke, { keyId: args.keyId });
+    await ctx.runMutation(this.component.mutations.revoke, { keyId: args.keyId });
   }
 
   async revokeByTag(
     ctx: RunMutationCtx,
     args: { ownerId: string; tag: string },
   ): Promise<{ revokedCount: number }> {
-    return await ctx.runMutation(this.component.public.revokeByTag, args);
+    return await ctx.runMutation(this.component.mutations.revokeByTag, args);
   }
 
   async rotate(
@@ -563,7 +566,7 @@ export class ApiKeys {
     const lookupPrefix = generateRandomHex(8);
     const secretHex = generateRandomHex(64);
 
-    return await ctx.runMutation(this.component.public.rotate, {
+    return await ctx.runMutation(this.component.mutations.rotate, {
       keyId: args.keyId,
       gracePeriodMs: args.gracePeriodMs,
       lookupPrefix,
@@ -576,7 +579,7 @@ export class ApiKeys {
     args: { ownerId: string; env?: string; status?: KeyStatus },
   ): Promise<KeyMetadata[]> {
     return await ctx.runQuery(
-      this.component.public.list,
+      this.component.queries.list,
       args,
     ) as unknown as KeyMetadata[];
   }
@@ -586,7 +589,7 @@ export class ApiKeys {
     args: { ownerId: string; tag: string },
   ): Promise<KeyMetadata[]> {
     return await ctx.runQuery(
-      this.component.public.listByTag,
+      this.component.queries.listByTag,
       args,
     ) as unknown as KeyMetadata[];
   }
@@ -601,7 +604,7 @@ export class ApiKeys {
       metadata?: Record<string, unknown>;
     },
   ): Promise<void> {
-    await ctx.runMutation(this.component.public.update, {
+    await ctx.runMutation(this.component.mutations.update, {
       keyId: args.keyId,
       name: args.name,
       scopes: args.scopes,
@@ -611,18 +614,18 @@ export class ApiKeys {
   }
 
   async disable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.public.disable, { keyId: args.keyId });
+    await ctx.runMutation(this.component.mutations.disable, { keyId: args.keyId });
   }
 
   async enable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.public.enable, { keyId: args.keyId });
+    await ctx.runMutation(this.component.mutations.enable, { keyId: args.keyId });
   }
 
   async getUsage(
     ctx: RunQueryCtx,
     args: { keyId: string; period?: { start: number; end: number } },
   ): Promise<UsageStats> {
-    return await ctx.runQuery(this.component.public.getUsage, {
+    return await ctx.runQuery(this.component.queries.getUsage, {
       keyId: args.keyId,
       period: args.period,
     }) as UsageStats;
@@ -632,10 +635,11 @@ export class ApiKeys {
     ctx: RunMutationCtx,
     args: { cleanupIntervalMs?: number; defaultExpiryMs?: number },
   ): Promise<void> {
-    await ctx.runMutation(this.component.public.configure, args);
+    await ctx.runMutation(this.component.mutations.configure, args);
   }
 }
 ```
+
 
 ---
 
@@ -644,27 +648,22 @@ export class ApiKeys {
 ```ts
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { KEY_TYPE, KEY_STATUS } from "../shared.js";
+import { jsonValue } from "./validators.js";
 
 export default defineSchema({
   apiKeys: defineTable({
     hash: v.string(),
     lookupPrefix: v.string(),
     keyPrefix: v.string(),
-    type: v.union(v.literal("secret"), v.literal("publishable")),
+    type: KEY_TYPE,
     env: v.string(),
     ownerId: v.string(),
     name: v.string(),
     scopes: v.array(v.string()),
     tags: v.array(v.string()),
-    status: v.union(
-      v.literal("active"),
-      v.literal("disabled"),
-      v.literal("revoked"),
-      v.literal("rotating"),
-      v.literal("expired"),
-      v.literal("exhausted"),
-    ),
-    metadata: v.optional(v.any()),
+    status: KEY_STATUS,
+    metadata: v.optional(jsonValue),
     remaining: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     gracePeriodEnd: v.optional(v.number()),
@@ -681,7 +680,7 @@ export default defineSchema({
     ownerId: v.string(),
     eventType: v.string(),
     reason: v.optional(v.string()),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(jsonValue),
     timestamp: v.number(),
   })
     .index("by_key", ["keyId", "timestamp"])
@@ -694,13 +693,26 @@ export default defineSchema({
 });
 ```
 
+
 ---
 
-## src/component/public.ts
+## src/component/validators.ts
 
 ```ts
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server.js";
+
+/** Arbitrary JSON metadata attached to keys, events, or config. */
+export const jsonValue = v.any();
+```
+
+
+---
+
+## src/component/mutations.ts
+
+```ts
+import { v } from "convex/values";
+import { mutation } from "./_generated/server.js";
 import { components } from "./_generated/api.js";
 import { RateLimiter, MINUTE, HOUR } from "@convex-dev/rate-limiter";
 import { ShardedCounter } from "@convex-dev/sharded-counter";
@@ -715,6 +727,7 @@ import {
   KEY_PREFIX_SEPARATOR,
 } from "../shared.js";
 import { createLogger } from "../log.js";
+import { jsonValue } from "./validators.js";
 import type { KeyStatus } from "../shared.js";
 
 const log = createLogger("api-keys");
@@ -734,7 +747,7 @@ export const create = mutation({
     scopes: v.optional(v.array(v.string())),
     tags: v.optional(v.array(v.string())),
     env: v.optional(v.string()),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(jsonValue),
     remaining: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     keyPrefix: v.optional(v.string()),
@@ -812,7 +825,7 @@ export const validate = mutation({
       env: v.string(),
       scopes: v.array(v.string()),
       tags: v.array(v.string()),
-      metadata: v.optional(v.any()),
+      metadata: v.optional(jsonValue),
       remaining: v.optional(v.number()),
     }),
     v.object({
@@ -1101,125 +1114,13 @@ export const rotate = mutation({
   },
 });
 
-export const list = query({
-  args: {
-    ownerId: v.string(),
-    env: v.optional(v.string()),
-    status: v.optional(KEY_STATUS),
-  },
-  returns: v.array(
-    v.object({
-      keyId: v.id("apiKeys"),
-      name: v.string(),
-      lookupPrefix: v.string(),
-      type: KEY_TYPE,
-      env: v.string(),
-      scopes: v.array(v.string()),
-      tags: v.array(v.string()),
-      status: KEY_STATUS,
-      metadata: v.optional(v.any()),
-      remaining: v.optional(v.number()),
-      expiresAt: v.optional(v.number()),
-      createdAt: v.number(),
-      lastUsedAt: v.optional(v.number()),
-    }),
-  ),
-  handler: async (ctx, { ownerId, env, status }) => {
-    let keysQuery;
-    if (env) {
-      keysQuery = ctx.db
-        .query("apiKeys")
-        .withIndex("by_owner_env", (q) => {
-          const q2 = q.eq("ownerId", ownerId).eq("env", env);
-          return status ? q2.eq("status", status) : q2;
-        });
-    } else if (status) {
-      keysQuery = ctx.db
-        .query("apiKeys")
-        .withIndex("by_owner_status", (q) =>
-          q.eq("ownerId", ownerId).eq("status", status),
-        );
-    } else {
-      keysQuery = ctx.db
-        .query("apiKeys")
-        .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId));
-    }
-
-    const keys = await keysQuery.collect();
-
-    return keys.map((k) => ({
-      keyId: k._id,
-      name: k.name,
-      lookupPrefix: k.lookupPrefix,
-      type: k.type,
-      env: k.env,
-      scopes: k.scopes,
-      tags: k.tags,
-      status: k.status,
-      metadata: k.metadata,
-      remaining: k.remaining,
-      expiresAt: k.expiresAt,
-      createdAt: k._creationTime,
-      lastUsedAt: k.lastUsedAt,
-    }));
-  },
-});
-
-export const listByTag = query({
-  args: {
-    ownerId: v.string(),
-    tag: v.string(),
-  },
-  returns: v.array(
-    v.object({
-      keyId: v.id("apiKeys"),
-      name: v.string(),
-      lookupPrefix: v.string(),
-      type: KEY_TYPE,
-      env: v.string(),
-      scopes: v.array(v.string()),
-      tags: v.array(v.string()),
-      status: KEY_STATUS,
-      metadata: v.optional(v.any()),
-      remaining: v.optional(v.number()),
-      expiresAt: v.optional(v.number()),
-      createdAt: v.number(),
-      lastUsedAt: v.optional(v.number()),
-    }),
-  ),
-  handler: async (ctx, { ownerId, tag }) => {
-    const keys = await ctx.db
-      .query("apiKeys")
-      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId))
-      .collect();
-
-    return keys
-      .filter((k) => k.tags.includes(tag))
-      .map((k) => ({
-        keyId: k._id,
-        name: k.name,
-        lookupPrefix: k.lookupPrefix,
-        type: k.type,
-        env: k.env,
-        scopes: k.scopes,
-        tags: k.tags,
-        status: k.status,
-        metadata: k.metadata,
-        remaining: k.remaining,
-        expiresAt: k.expiresAt,
-        createdAt: k._creationTime,
-        lastUsedAt: k.lastUsedAt,
-      }));
-  },
-});
-
 export const update = mutation({
   args: {
     keyId: v.id("apiKeys"),
     name: v.optional(v.string()),
     scopes: v.optional(v.array(v.string())),
     tags: v.optional(v.array(v.string())),
-    metadata: v.optional(v.any()),
+    metadata: v.optional(jsonValue),
   },
   returns: v.null(),
   handler: async (ctx, { keyId, ...updates }) => {
@@ -1305,6 +1206,151 @@ export const enable = mutation({
   },
 });
 
+export const configure = mutation({
+  args: {
+    cleanupIntervalMs: v.optional(v.number()),
+    defaultExpiryMs: v.optional(v.number()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.query("config").first();
+    if (existing) {
+      await ctx.db.patch(existing._id, args);
+    } else {
+      await ctx.db.insert("config", args);
+    }
+    return null;
+  },
+});
+```
+
+
+---
+
+## src/component/queries.ts
+
+```ts
+import { v } from "convex/values";
+import { query } from "./_generated/server.js";
+import { components } from "./_generated/api.js";
+import { ShardedCounter } from "@convex-dev/sharded-counter";
+import { KEY_STATUS, KEY_TYPE } from "../shared.js";
+import { jsonValue } from "./validators.js";
+
+const counter = new ShardedCounter(components.shardedCounter);
+
+export const list = query({
+  args: {
+    ownerId: v.string(),
+    env: v.optional(v.string()),
+    status: v.optional(KEY_STATUS),
+  },
+  returns: v.array(
+    v.object({
+      keyId: v.id("apiKeys"),
+      name: v.string(),
+      lookupPrefix: v.string(),
+      type: KEY_TYPE,
+      env: v.string(),
+      scopes: v.array(v.string()),
+      tags: v.array(v.string()),
+      status: KEY_STATUS,
+      metadata: v.optional(jsonValue),
+      remaining: v.optional(v.number()),
+      expiresAt: v.optional(v.number()),
+      createdAt: v.number(),
+      lastUsedAt: v.optional(v.number()),
+    }),
+  ),
+  handler: async (ctx, { ownerId, env, status }) => {
+    let keysQuery;
+    if (env) {
+      keysQuery = ctx.db
+        .query("apiKeys")
+        .withIndex("by_owner_env", (q) => {
+          const q2 = q.eq("ownerId", ownerId).eq("env", env);
+          return status ? q2.eq("status", status) : q2;
+        });
+    } else if (status) {
+      keysQuery = ctx.db
+        .query("apiKeys")
+        .withIndex("by_owner_status", (q) =>
+          q.eq("ownerId", ownerId).eq("status", status),
+        );
+    } else {
+      keysQuery = ctx.db
+        .query("apiKeys")
+        .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId));
+    }
+
+    const keys = await keysQuery.collect();
+
+    return keys.map((k) => ({
+      keyId: k._id,
+      name: k.name,
+      lookupPrefix: k.lookupPrefix,
+      type: k.type,
+      env: k.env,
+      scopes: k.scopes,
+      tags: k.tags,
+      status: k.status,
+      metadata: k.metadata,
+      remaining: k.remaining,
+      expiresAt: k.expiresAt,
+      createdAt: k._creationTime,
+      lastUsedAt: k.lastUsedAt,
+    }));
+  },
+});
+
+export const listByTag = query({
+  args: {
+    ownerId: v.string(),
+    tag: v.string(),
+  },
+  returns: v.array(
+    v.object({
+      keyId: v.id("apiKeys"),
+      name: v.string(),
+      lookupPrefix: v.string(),
+      type: KEY_TYPE,
+      env: v.string(),
+      scopes: v.array(v.string()),
+      tags: v.array(v.string()),
+      status: KEY_STATUS,
+      metadata: v.optional(jsonValue),
+      remaining: v.optional(v.number()),
+      expiresAt: v.optional(v.number()),
+      createdAt: v.number(),
+      lastUsedAt: v.optional(v.number()),
+    }),
+  ),
+  handler: async (ctx, { ownerId, tag }) => {
+    const keys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId))
+      .collect();
+
+    return keys
+      .filter((k) => k.tags.includes(tag))
+      .map((k) => ({
+        keyId: k._id,
+        name: k.name,
+        lookupPrefix: k.lookupPrefix,
+        type: k.type,
+        env: k.env,
+        scopes: k.scopes,
+        tags: k.tags,
+        status: k.status,
+        metadata: k.metadata,
+        remaining: k.remaining,
+        expiresAt: k.expiresAt,
+        createdAt: k._creationTime,
+        lastUsedAt: k.lastUsedAt,
+      }));
+  },
+});
+
 export const getUsage = query({
   args: {
     keyId: v.id("apiKeys"),
@@ -1346,24 +1392,8 @@ export const getUsage = query({
     };
   },
 });
-
-export const configure = mutation({
-  args: {
-    cleanupIntervalMs: v.optional(v.number()),
-    defaultExpiryMs: v.optional(v.number()),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const existing = await ctx.db.query("config").first();
-    if (existing) {
-      await ctx.db.patch(existing._id, args);
-    } else {
-      await ctx.db.insert("config", args);
-    }
-    return null;
-  },
-});
 ```
+
 
 ---
 
@@ -1386,3 +1416,4 @@ export function register(
 
 export default { register, schema, modules };
 ```
+
