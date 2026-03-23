@@ -44,18 +44,16 @@
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
     "release": "npm version patch && npm publish && git push --follow-tags"
   },
-  "peerDependencies": {
-    "convex": "^1.33.0",
+  "dependencies": {
     "@convex-dev/rate-limiter": "^0.3.0",
     "@convex-dev/sharded-counter": "^0.2.0",
     "@convex-dev/aggregate": "^0.2.0",
     "@convex-dev/crons": "^0.2.0"
   },
+  "peerDependencies": {
+    "convex": "^1.33.0"
+  },
   "devDependencies": {
-    "@convex-dev/aggregate": "^0.2.0",
-    "@convex-dev/crons": "^0.2.0",
-    "@convex-dev/rate-limiter": "^0.3.0",
-    "@convex-dev/sharded-counter": "^0.2.0",
     "@edge-runtime/vm": "^4.0.0",
     "@vllnt/eslint-config": "^1.0.0",
     "@vllnt/typescript": "^1.0.0",
