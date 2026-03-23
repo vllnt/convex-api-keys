@@ -4,6 +4,9 @@ export default defineConfig({
   test: {
     environment: "edge-runtime",
     exclude: ["**/node_modules/**", "dist/**"],
+    typecheck: {
+      tsconfig: "./tsconfig.test.json",
+    },
     coverage: {
       include: [
         "src/shared.ts",

@@ -19,6 +19,9 @@
     "./_generated/component.js": {
       "types": "./dist/component/_generated/component.d.ts"
     },
+    "./_generated/component": {
+      "types": "./dist/component/_generated/component.d.ts"
+    },
     "./convex.config": {
       "types": "./dist/component/convex.config.d.ts",
       "default": "./dist/component/convex.config.js"
@@ -38,9 +41,11 @@
     "typecheck:ci": "tsc --noEmit --project tsconfig.ci.json",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest",
+    "test:watch": "vitest --typecheck --clearScreen false",
+    "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "generate:llms": "node -e \"const{execSync:e}=require('child_process');const fs=require('fs');const files=['README.md','src/shared.ts','src/client/types.ts','src/client/index.ts','src/component/schema.ts','src/component/validators.ts','src/component/mutations.ts','src/component/queries.ts','src/test.ts'];let out='# @vllnt/convex-api-keys — Full Source\\n\\nAuto-generated. Do not edit manually.\\n';for(const f of files){out+='\\n---\\n\\n## '+f+'\\n\\n';if(f.endsWith('.md')){out+=fs.readFileSync(f,'utf8')}else{out+='\\`\\`\\`ts\\n'+fs.readFileSync(f,'utf8')+'\\`\\`\\`'}out+='\\n'}fs.writeFileSync('llms-full.txt',out)\"",
     "preversion": "pnpm install --frozen-lockfile && pnpm build:clean && pnpm test && pnpm typecheck && pnpm generate:llms",
+    "prepublishOnly": "npm whoami || npm login",
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
     "release": "npm version patch && npm publish && git push --follow-tags"
   },
