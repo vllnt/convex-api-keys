@@ -1,6 +1,6 @@
 {
   "name": "@vllnt/convex-api-keys",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Convex component for secure API key management — create, validate, revoke, rotate, rate-limit, track usage",
   "license": "Apache-2.0",
   "type": "module",
