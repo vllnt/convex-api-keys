@@ -4,32 +4,33 @@
 
 # @vllnt/convex-api-keys
 
-Secure API key management as a [Convex component](https://docs.convex.dev/components). Create, validate, revoke, rotate, rate-limit, and track usage — all backed by battle-tested `@convex-dev/*` ecosystem components.
+Secure API key management as a [Convex component](https://docs.convex.dev/components). Create, validate, revoke, rotate, and track usage — all with built-in auth boundaries and structured audit logging.
 
 ## Features
 
-- **Secure by default** — SHA-256 hashed storage, constant-time comparison, prefix-indexed O(1) lookup
+- **Secure by default** — SHA-256 hashed storage, constant-time comparison, prefix-indexed O(1) lookup, server-side secret generation
+- **Auth boundary** — `ownerId` required on all admin mutations — prevents cross-tenant access
 - **Key types** — `secret` and `publishable` keys with type-encoded prefixes
 - **Finite-use keys** — `remaining` counter with atomic decrement (verification tokens, one-time-use)
 - **Disable / Enable** — reversible pause without revoking
-- **Rotation** — configurable grace period where both old and new keys are valid
-- **Bulk revoke** — revoke all keys matching a tag in one call
+- **Rotation** — configurable grace period (60s–30d) where both old and new keys are valid
+- **Bulk revoke** — revoke all keys matching a tag (active, rotating, and disabled)
 - **Tags & environments** — filter keys by tags and environment strings
 - **Multi-tenant** — every query scoped by `ownerId`, no cross-tenant leakage
-- **Usage tracking** — audit event log + per-key usage analytics
-- **Extensible** — custom metadata, configurable prefix, event callbacks
+- **Usage tracking** — per-key usage counter via `@convex-dev/sharded-counter`
+- **Input validation** — keyPrefix/env charset, metadata size (4KB), scopes (50), tags (20)
+- **Structured logging** — audit trail via structured logs (Convex dashboard)
 
 ## Architecture
 
 ```
 Your App → @vllnt/convex-api-keys
-               ├── @convex-dev/rate-limiter   (per-key rate limiting)
-               ├── @convex-dev/sharded-counter (high-throughput counters)
-               ├── @convex-dev/aggregate       (O(log n) analytics)
-               └── @convex-dev/crons           (scheduled cleanup)
+               └── @convex-dev/sharded-counter (high-throughput usage counters)
 ```
 
-You install one package. Child components are internal — they don't appear in your `convex.config.ts`.
+You install one package. The child component is internal — it doesn't appear in your `convex.config.ts`.
+
+> **Rate limiting** is your responsibility. Add `@convex-dev/rate-limiter` at your HTTP action/mutation layer where you have real caller context (IP, auth, plan tier). The component has zero caller context and cannot make informed rate-limit decisions.
 
 ## Installation
 
@@ -45,9 +46,6 @@ import apiKeys from "@vllnt/convex-api-keys/convex.config";
 
 const app = defineApp();
 app.use(apiKeys);
-
-// Optional: multiple isolated instances
-app.use(apiKeys, { name: "serviceKeys" });
 
 export default app;
 ```
@@ -72,15 +70,16 @@ const apiKeys = new ApiKeys(components.apiKeys, {
 const { key, keyId } = await apiKeys.create(ctx, {
   name: "Production SDK Key",
   ownerId: orgId,
-  type: "secret",                          // "secret" | "publishable"
+  type: "secret",
   scopes: ["read:users", "write:orders"],
   tags: ["sdk", "v2"],
-  env: "live",                             // any string
+  env: "live",
   metadata: { plan: "enterprise" },
   expiresAt: Date.now() + 90 * 24 * 60 * 60 * 1000,
-  remaining: 100000,                       // optional: finite-use
+  remaining: 100000,
 });
 // key = "myapp_secret_live_a1b2c3d4_<64-char-hex>"
+// Secret material is generated server-side — never passed from client
 ```
 
 ### Validate a key
@@ -90,18 +89,17 @@ const result = await apiKeys.validate(ctx, { key: bearerToken });
 
 if (!result.valid) {
   // result.reason: "malformed" | "not_found" | "revoked" | "expired"
-  //                | "exhausted" | "disabled" | "rate_limited"
+  //                | "exhausted" | "disabled"
   return new Response("Unauthorized", { status: 401 });
 }
 
-// result.valid === true
 const { keyId, ownerId, scopes, tags, env, type, metadata, remaining } = result;
 ```
 
 ### List keys
 
 ```ts
-const allKeys = await apiKeys.list(ctx, { ownerId: orgId });
+const keys = await apiKeys.list(ctx, { ownerId: orgId });
 const prodKeys = await apiKeys.list(ctx, { ownerId: orgId, env: "live" });
 const taggedKeys = await apiKeys.listByTag(ctx, { ownerId: orgId, tag: "sdk" });
 ```
@@ -111,6 +109,7 @@ const taggedKeys = await apiKeys.listByTag(ctx, { ownerId: orgId, tag: "sdk" });
 ```ts
 await apiKeys.update(ctx, {
   keyId,
+  ownerId: orgId,  // required — auth boundary
   name: "Renamed Key",
   scopes: ["read:users"],
   tags: ["sdk", "v3"],
@@ -121,19 +120,16 @@ await apiKeys.update(ctx, {
 ### Disable / Enable
 
 ```ts
-await apiKeys.disable(ctx, { keyId });
-// validate() → { valid: false, reason: "disabled" }
-
-await apiKeys.enable(ctx, { keyId });
-// validate() → { valid: true, ... }
+await apiKeys.disable(ctx, { keyId, ownerId: orgId });
+await apiKeys.enable(ctx, { keyId, ownerId: orgId });
 ```
 
 ### Revoke
 
 ```ts
-await apiKeys.revoke(ctx, { keyId });
+await apiKeys.revoke(ctx, { keyId, ownerId: orgId });
 
-// Bulk revoke by tag
+// Bulk revoke by tag (catches active, rotating, and disabled keys)
 await apiKeys.revokeByTag(ctx, { ownerId: orgId, tag: "compromised" });
 ```
 
@@ -142,31 +138,16 @@ await apiKeys.revokeByTag(ctx, { ownerId: orgId, tag: "compromised" });
 ```ts
 const { newKey, newKeyId, oldKeyExpiresAt } = await apiKeys.rotate(ctx, {
   keyId,
-  gracePeriodMs: 3600000, // 1 hour — both keys valid
+  ownerId: orgId,       // required — auth boundary
+  gracePeriodMs: 3600000, // 1 hour — both keys valid (min 60s, max 30d)
 });
 ```
 
 ### Usage analytics
 
 ```ts
-const usage = await apiKeys.getUsage(ctx, {
-  keyId,
-  period: { start: startOfMonth, end: Date.now() },
-});
-// { total: 42000, remaining: 58000, lastUsedAt: 1711036800000 }
-```
-
-### Finite-use keys (verification tokens)
-
-```ts
-const { key } = await apiKeys.create(ctx, {
-  name: "Email Verification",
-  ownerId: userId,
-  remaining: 1,
-  expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-});
-// First validate: { valid: true, remaining: 0 }
-// Second validate: { valid: false, reason: "exhausted" }
+const usage = await apiKeys.getUsage(ctx, { keyId, ownerId: orgId });
+// { total: 42000, remaining: 58000 }
 ```
 
 ## Key Format
@@ -195,16 +176,22 @@ create() → ACTIVE ──→ DISABLED (reversible via enable())
 |--------|-----|-------------|
 | `create(ctx, options)` | mutation | Create a new API key |
 | `validate(ctx, { key })` | mutation | Validate and track usage |
-| `revoke(ctx, { keyId })` | mutation | Permanently revoke a key |
+| `revoke(ctx, { keyId, ownerId })` | mutation | Permanently revoke a key |
 | `revokeByTag(ctx, { ownerId, tag })` | mutation | Bulk revoke by tag |
-| `rotate(ctx, { keyId, gracePeriodMs? })` | mutation | Rotate with grace period |
-| `list(ctx, { ownerId, env?, status? })` | query | List keys (no secrets exposed) |
-| `listByTag(ctx, { ownerId, tag })` | query | Filter by tag |
-| `update(ctx, { keyId, name?, scopes?, tags?, metadata? })` | mutation | Update metadata in-place |
-| `disable(ctx, { keyId })` | mutation | Temporarily disable |
-| `enable(ctx, { keyId })` | mutation | Re-enable disabled key |
-| `getUsage(ctx, { keyId, period? })` | query | Usage analytics |
-| `configure(ctx, { ... })` | mutation | Runtime config |
+| `rotate(ctx, { keyId, ownerId, gracePeriodMs? })` | mutation | Rotate with grace period |
+| `list(ctx, { ownerId, env?, status?, limit? })` | query | List keys (paginated, default 100) |
+| `listByTag(ctx, { ownerId, tag, limit? })` | query | Filter by tag |
+| `update(ctx, { keyId, ownerId, name?, ... })` | mutation | Update metadata in-place |
+| `disable(ctx, { keyId, ownerId })` | mutation | Temporarily disable |
+| `enable(ctx, { keyId, ownerId })` | mutation | Re-enable disabled key |
+| `getUsage(ctx, { keyId, ownerId })` | query | Usage counter (O(1)) |
+| `configure(ctx, { ... })` | mutation | Runtime config (admin-only) |
+
+## Security Model
+
+This component protects against **accidental cross-tenant bugs in honest host apps**. The `ownerId` check prevents a bug from operating on another tenant's keys — it does NOT prevent a compromised host app from passing a forged `ownerId`.
+
+Integrators must derive `ownerId` from their own auth layer (e.g., `ctx.auth.getUserIdentity()`) before passing it to the component.
 
 ## Testing
 
@@ -213,9 +200,11 @@ For testing with `convex-test`:
 ```ts
 import { convexTest } from "convex-test";
 import { register } from "@vllnt/convex-api-keys/test";
+import shardedCounterTest from "@convex-dev/sharded-counter/test";
 
 const t = convexTest(schema, modules);
 register(t, "apiKeys");
+shardedCounterTest.register(t, "apiKeys/shardedCounter");
 ```
 
 ## Contributing

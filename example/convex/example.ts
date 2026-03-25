@@ -3,8 +3,6 @@ import { v } from "convex/values";
 import { ApiKeys } from "../../src/client/index.js";
 import { components } from "./_generated/api.js";
 
-const MINUTE = 60 * 1000;
-
 const apiKeys = new ApiKeys(components.apiKeys, {
   prefix: "myapp",
 });
@@ -107,10 +105,10 @@ export const listByTag = query({
 });
 
 export const revokeKey = mutation({
-  args: { keyId: v.string() },
+  args: { keyId: v.string(), ownerId: v.string() },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
-    await apiKeys.revoke(ctx, { keyId });
+  handler: async (ctx, { keyId, ownerId }) => {
+    await apiKeys.revoke(ctx, { keyId, ownerId });
     return null;
   },
 });
@@ -129,17 +127,19 @@ export const revokeByTag = mutation({
 export const rotateKey = mutation({
   args: {
     keyId: v.string(),
+    ownerId: v.string(),
     gracePeriodMs: v.optional(v.number()),
   },
   returns: v.any(),
-  handler: async (ctx, { keyId, gracePeriodMs }) => {
-    return await apiKeys.rotate(ctx, { keyId, gracePeriodMs });
+  handler: async (ctx, { keyId, ownerId, gracePeriodMs }) => {
+    return await apiKeys.rotate(ctx, { keyId, ownerId, gracePeriodMs });
   },
 });
 
 export const updateKey = mutation({
   args: {
     keyId: v.string(),
+    ownerId: v.string(),
     name: v.optional(v.string()),
     scopes: v.optional(v.array(v.string())),
     tags: v.optional(v.array(v.string())),
@@ -153,19 +153,19 @@ export const updateKey = mutation({
 });
 
 export const disableKey = mutation({
-  args: { keyId: v.string() },
+  args: { keyId: v.string(), ownerId: v.string() },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
-    await apiKeys.disable(ctx, { keyId });
+  handler: async (ctx, { keyId, ownerId }) => {
+    await apiKeys.disable(ctx, { keyId, ownerId });
     return null;
   },
 });
 
 export const enableKey = mutation({
-  args: { keyId: v.string() },
+  args: { keyId: v.string(), ownerId: v.string() },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
-    await apiKeys.enable(ctx, { keyId });
+  handler: async (ctx, { keyId, ownerId }) => {
+    await apiKeys.enable(ctx, { keyId, ownerId });
     return null;
   },
 });
@@ -173,12 +173,7 @@ export const enableKey = mutation({
 export const getUsage = query({
   args: {
     keyId: v.string(),
-    period: v.optional(
-      v.object({
-        start: v.number(),
-        end: v.number(),
-      }),
-    ),
+    ownerId: v.string(),
   },
   returns: v.any(),
   handler: async (ctx, args) => {
