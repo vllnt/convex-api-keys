@@ -1,6 +1,6 @@
-import type { KeyType, KeyStatus, EventType } from "../shared.js";
+import type { KeyType, KeyStatus } from "../shared.js";
 
-export type { KeyType, KeyStatus, EventType };
+export type { KeyType, KeyStatus };
 
 export interface CreateKeyOptions {
   name: string;
@@ -58,20 +58,10 @@ export interface KeyMetadata {
 export interface UsageStats {
   total: number;
   remaining?: number;
-  lastUsedAt?: number;
 }
 
 export interface RotateResult {
   newKeyId: string;
   newKey: string;
   oldKeyExpiresAt: number;
-}
-
-export interface KeyEvent {
-  keyId: string;
-  ownerId: string;
-  eventType: EventType;
-  reason?: string;
-  metadata?: Record<string, unknown>;
-  timestamp: number;
 }

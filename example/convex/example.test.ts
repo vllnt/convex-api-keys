@@ -3,10 +3,7 @@ import { expect, test, describe, vi, beforeEach, afterEach } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api.js";
 import { register } from "../../src/test.js";
-import rateLimiterTest from "@convex-dev/rate-limiter/test";
 import shardedCounterTest from "@convex-dev/sharded-counter/test";
-import aggregateTest from "@convex-dev/aggregate/test";
-import cronsTest from "@convex-dev/crons/test";
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -15,10 +12,7 @@ const HOUR = 3600000;
 function setup() {
   const t = convexTest(undefined!, modules);
   register(t, "apiKeys");
-  rateLimiterTest.register(t, "apiKeys/rateLimiter");
   shardedCounterTest.register(t, "apiKeys/shardedCounter");
-  aggregateTest.register(t, "apiKeys/usageAggregate");
-  cronsTest.register(t, "apiKeys/crons");
   return t;
 }
 
@@ -192,7 +186,7 @@ describe("validate", () => {
       name: "Revoke Me",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.revokeKey, { keyId: created.keyId });
+    await t.mutation(api.example.revokeKey, { keyId: created.keyId, ownerId: "org_1" });
     const result = await t.mutation(api.example.validateKey, {
       key: created.key,
     });
@@ -206,7 +200,7 @@ describe("validate", () => {
       name: "Disable Me",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.disableKey, { keyId: created.keyId });
+    await t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_1" });
     const result = await t.mutation(api.example.validateKey, {
       key: created.key,
     });
@@ -250,6 +244,7 @@ describe("expiry", () => {
     });
     await t.mutation(api.example.rotateKey, {
       keyId: created.keyId,
+      ownerId: "org_1",
       gracePeriodMs: HOUR,
     });
 
@@ -323,12 +318,12 @@ describe("disable / enable", () => {
       ownerId: "org_1",
     });
 
-    await t.mutation(api.example.disableKey, { keyId: created.keyId });
+    await t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_1" });
     let result = await t.mutation(api.example.validateKey, { key: created.key });
     expect(result.valid).toBe(false);
     expect(result.reason).toBe("disabled");
 
-    await t.mutation(api.example.enableKey, { keyId: created.keyId });
+    await t.mutation(api.example.enableKey, { keyId: created.keyId, ownerId: "org_1" });
     result = await t.mutation(api.example.validateKey, { key: created.key });
     expect(result.valid).toBe(true);
   });
@@ -339,9 +334,9 @@ describe("disable / enable", () => {
       name: "Already Disabled",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.disableKey, { keyId: created.keyId });
+    await t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_1" });
     // Second disable should not throw
-    await t.mutation(api.example.disableKey, { keyId: created.keyId });
+    await t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_1" });
   });
 
   test("enable already active key is idempotent", async () => {
@@ -351,7 +346,7 @@ describe("disable / enable", () => {
       ownerId: "org_1",
     });
     // Enable when already active should not throw
-    await t.mutation(api.example.enableKey, { keyId: created.keyId });
+    await t.mutation(api.example.enableKey, { keyId: created.keyId, ownerId: "org_1" });
   });
 
   test("disable non-active key throws", async () => {
@@ -360,9 +355,9 @@ describe("disable / enable", () => {
       name: "Revoked",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.revokeKey, { keyId: created.keyId });
+    await t.mutation(api.example.revokeKey, { keyId: created.keyId, ownerId: "org_1" });
     await expect(
-      t.mutation(api.example.disableKey, { keyId: created.keyId }),
+      t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_1" }),
     ).rejects.toThrow("can only disable active keys");
   });
 
@@ -372,9 +367,9 @@ describe("disable / enable", () => {
       name: "Revoked",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.revokeKey, { keyId: created.keyId });
+    await t.mutation(api.example.revokeKey, { keyId: created.keyId, ownerId: "org_1" });
     await expect(
-      t.mutation(api.example.enableKey, { keyId: created.keyId }),
+      t.mutation(api.example.enableKey, { keyId: created.keyId, ownerId: "org_1" }),
     ).rejects.toThrow("can only enable disabled keys");
   });
 });
@@ -393,6 +388,7 @@ describe("update", () => {
 
     await t.mutation(api.example.updateKey, {
       keyId: created.keyId,
+      ownerId: "org_1",
       name: "Renamed",
       scopes: ["read", "write"],
       tags: ["v2"],
@@ -414,7 +410,7 @@ describe("update", () => {
       ownerId: "org_1",
     });
     // Should not throw
-    await t.mutation(api.example.updateKey, { keyId: created.keyId });
+    await t.mutation(api.example.updateKey, { keyId: created.keyId, ownerId: "org_1" });
   });
 
   test("update terminal key throws", async () => {
@@ -423,10 +419,11 @@ describe("update", () => {
       name: "Terminal",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.revokeKey, { keyId: created.keyId });
+    await t.mutation(api.example.revokeKey, { keyId: created.keyId, ownerId: "org_1" });
     await expect(
       t.mutation(api.example.updateKey, {
         keyId: created.keyId,
+        ownerId: "org_1",
         name: "Can't",
       }),
     ).rejects.toThrow("cannot update terminal key");
@@ -441,6 +438,7 @@ describe("update", () => {
     await expect(
       t.mutation(api.example.updateKey, {
         keyId: created.keyId,
+        ownerId: "org_1",
         tags: ["-nope"],
       }),
     ).rejects.toThrow("Invalid tag");
@@ -456,9 +454,15 @@ describe("revoke", () => {
       name: "Double Revoke",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.revokeKey, { keyId: created.keyId });
+    await t.mutation(api.example.revokeKey, {
+      keyId: created.keyId,
+      ownerId: "org_1",
+    });
     // Second revoke should not throw
-    await t.mutation(api.example.revokeKey, { keyId: created.keyId });
+    await t.mutation(api.example.revokeKey, {
+      keyId: created.keyId,
+      ownerId: "org_1",
+    });
   });
 });
 
@@ -524,6 +528,7 @@ describe("rotate", () => {
 
     const rotated = await t.mutation(api.example.rotateKey, {
       keyId: created.keyId,
+      ownerId: "org_1",
       gracePeriodMs: HOUR,
     });
 
@@ -553,6 +558,7 @@ describe("rotate", () => {
 
     const rotated = await t.mutation(api.example.rotateKey, {
       keyId: created.keyId,
+      ownerId: "org_1",
     });
 
     expect(rotated.newKey).toContain("_test_");
@@ -570,9 +576,9 @@ describe("rotate", () => {
       name: "Revoked",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.revokeKey, { keyId: created.keyId });
+    await t.mutation(api.example.revokeKey, { keyId: created.keyId, ownerId: "org_1" });
     await expect(
-      t.mutation(api.example.rotateKey, { keyId: created.keyId }),
+      t.mutation(api.example.rotateKey, { keyId: created.keyId, ownerId: "org_1" }),
     ).rejects.toThrow("cannot rotate a terminal key");
   });
 });
@@ -632,7 +638,7 @@ describe("list", () => {
       ownerId: "org_1",
       env: "live",
     });
-    await t.mutation(api.example.disableKey, { keyId: created.keyId });
+    await t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_1" });
 
     const active = await t.query(api.example.listKeys, {
       ownerId: "org_1",
@@ -652,7 +658,7 @@ describe("list", () => {
       name: "Revoked",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.revokeKey, { keyId: toRevoke.keyId });
+    await t.mutation(api.example.revokeKey, { keyId: toRevoke.keyId, ownerId: "org_1" });
 
     const active = await t.query(api.example.listKeys, {
       ownerId: "org_1",
@@ -703,26 +709,9 @@ describe("getUsage", () => {
 
     const usage = await t.query(api.example.getUsage, {
       keyId: created.keyId,
-    });
-    expect(usage.total).toBe(2);
-    expect(usage.lastUsedAt).toBeDefined();
-  });
-
-  test("returns usage for a time period", async () => {
-    const t = setup();
-    const before = Date.now();
-    const created = await t.mutation(api.example.createKey, {
-      name: "Period Key",
       ownerId: "org_1",
     });
-    await t.mutation(api.example.validateKey, { key: created.key });
-    const after = Date.now();
-
-    const usage = await t.query(api.example.getUsage, {
-      keyId: created.keyId,
-      period: { start: before, end: after + 1000 },
-    });
-    expect(usage.total).toBe(1);
+    expect(usage.total).toBe(2);
   });
 
   test("returns remaining for finite-use keys", async () => {
@@ -736,6 +725,7 @@ describe("getUsage", () => {
 
     const usage = await t.query(api.example.getUsage, {
       keyId: created.keyId,
+      ownerId: "org_1",
     });
     expect(usage.remaining).toBe(4);
   });
@@ -759,14 +749,181 @@ describe("parseKeyString edge cases", () => {
 describe("configure", () => {
   test("sets and updates configuration", async () => {
     const t = setup();
-    // First call inserts
     await t.mutation(api.example.configureKeys, {
       cleanupIntervalMs: 3600000,
       defaultExpiryMs: 86400000,
     });
-    // Second call patches
     await t.mutation(api.example.configureKeys, {
       cleanupIntervalMs: 7200000,
     });
+  });
+
+  test("rejects negative cleanupIntervalMs", async () => {
+    const t = setup();
+    await expect(
+      t.mutation(api.example.configureKeys, { cleanupIntervalMs: -1 }),
+    ).rejects.toThrow("cleanupIntervalMs must be > 0");
+  });
+
+  test("rejects zero defaultExpiryMs", async () => {
+    const t = setup();
+    await expect(
+      t.mutation(api.example.configureKeys, { defaultExpiryMs: 0 }),
+    ).rejects.toThrow("defaultExpiryMs must be > 0");
+  });
+});
+
+// ─── auth boundary (cross-tenant) ───────────────────────────────
+
+describe("auth boundary", () => {
+  test("revoke rejects wrong ownerId", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Auth Test",
+      ownerId: "org_1",
+    });
+    await expect(
+      t.mutation(api.example.revokeKey, { keyId: created.keyId, ownerId: "org_2" }),
+    ).rejects.toThrow("unauthorized");
+  });
+
+  test("disable rejects wrong ownerId", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Auth Test",
+      ownerId: "org_1",
+    });
+    await expect(
+      t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_2" }),
+    ).rejects.toThrow("unauthorized");
+  });
+
+  test("enable rejects wrong ownerId", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Auth Test",
+      ownerId: "org_1",
+    });
+    await t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_1" });
+    await expect(
+      t.mutation(api.example.enableKey, { keyId: created.keyId, ownerId: "org_2" }),
+    ).rejects.toThrow("unauthorized");
+  });
+
+  test("update rejects wrong ownerId", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Auth Test",
+      ownerId: "org_1",
+    });
+    await expect(
+      t.mutation(api.example.updateKey, { keyId: created.keyId, ownerId: "org_2", name: "Hacked" }),
+    ).rejects.toThrow("unauthorized");
+  });
+
+  test("rotate rejects wrong ownerId", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Auth Test",
+      ownerId: "org_1",
+    });
+    await expect(
+      t.mutation(api.example.rotateKey, { keyId: created.keyId, ownerId: "org_2" }),
+    ).rejects.toThrow("unauthorized");
+  });
+
+  test("getUsage rejects wrong ownerId", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Auth Test",
+      ownerId: "org_1",
+    });
+    await expect(
+      t.query(api.example.getUsage, { keyId: created.keyId, ownerId: "org_2" }),
+    ).rejects.toThrow("unauthorized");
+  });
+});
+
+// ─── input validation ───────────────────────────────────────────
+
+describe("input validation", () => {
+  test("rejects env with underscores", async () => {
+    const t = setup();
+    await expect(
+      t.mutation(api.example.createKey, {
+        name: "Bad Env",
+        ownerId: "org_1",
+        env: "live_test",
+      }),
+    ).rejects.toThrow("Invalid env");
+  });
+
+  test("rejects metadata over 4KB", async () => {
+    const t = setup();
+    await expect(
+      t.mutation(api.example.createKey, {
+        name: "Big Meta",
+        ownerId: "org_1",
+        metadata: { data: "x".repeat(5000) },
+      }),
+    ).rejects.toThrow("metadata must be <= 4096 bytes");
+  });
+
+  test("rejects more than 50 scopes", async () => {
+    const t = setup();
+    const scopes = Array.from({ length: 51 }, (_, i) => `scope${i}`);
+    await expect(
+      t.mutation(api.example.createKey, {
+        name: "Too Many Scopes",
+        ownerId: "org_1",
+        scopes,
+      }),
+    ).rejects.toThrow("scopes must have <= 50 entries");
+  });
+
+  test("rejects more than 20 tags", async () => {
+    const t = setup();
+    const tags = Array.from({ length: 21 }, (_, i) => `tag${i}`);
+    await expect(
+      t.mutation(api.example.createKey, {
+        name: "Too Many Tags",
+        ownerId: "org_1",
+        tags,
+      }),
+    ).rejects.toThrow("tags must have <= 20 entries");
+  });
+});
+
+// ─── gracePeriodMs bounds ───────────────────────────────────────
+
+describe("gracePeriodMs bounds", () => {
+  test("rejects gracePeriodMs below minimum (60s)", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Grace Test",
+      ownerId: "org_1",
+    });
+    await expect(
+      t.mutation(api.example.rotateKey, {
+        keyId: created.keyId,
+        ownerId: "org_1",
+        gracePeriodMs: 59999,
+      }),
+    ).rejects.toThrow("gracePeriodMs must be between");
+  });
+
+  test("rejects gracePeriodMs above maximum (30 days)", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Grace Test",
+      ownerId: "org_1",
+    });
+    await expect(
+      t.mutation(api.example.rotateKey, {
+        keyId: created.keyId,
+        ownerId: "org_1",
+        gracePeriodMs: 30 * 24 * 60 * 60 * 1000 + 1,
+      }),
+    ).rejects.toThrow("gracePeriodMs must be between");
   });
 });

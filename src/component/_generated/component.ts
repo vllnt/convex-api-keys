@@ -37,15 +37,12 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           env?: string;
           expiresAt?: number;
-          hash: string;
           keyPrefix?: string;
-          lookupPrefix: string;
           metadata?: any;
           name: string;
           ownerId: string;
           remaining?: number;
           scopes?: Array<string>;
-          secretHex: string;
           tags?: Array<string>;
           type?: "secret" | "publishable";
         },
@@ -55,21 +52,21 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       disable: FunctionReference<
         "mutation",
         "internal",
-        { keyId: string },
+        { keyId: string; ownerId: string },
         null,
         Name
       >;
       enable: FunctionReference<
         "mutation",
         "internal",
-        { keyId: string },
+        { keyId: string; ownerId: string },
         null,
         Name
       >;
       revoke: FunctionReference<
         "mutation",
         "internal",
-        { keyId: string },
+        { keyId: string; ownerId: string },
         null,
         Name
       >;
@@ -86,8 +83,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         {
           gracePeriodMs?: number;
           keyId: string;
-          lookupPrefix: string;
-          secretHex: string;
+          ownerId: string;
         },
         { newKey: string; newKeyId: string; oldKeyExpiresAt: number },
         Name
@@ -99,6 +95,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
           keyId: string;
           metadata?: any;
           name?: string;
+          ownerId: string;
           scopes?: Array<string>;
           tags?: Array<string>;
         },
@@ -120,7 +117,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
             type: "secret" | "publishable";
             valid: true;
           }
-        | { reason: string; retryAfter?: number; valid: false },
+        | { reason: string; valid: false },
         Name
       >;
     };
@@ -128,8 +125,8 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       getUsage: FunctionReference<
         "query",
         "internal",
-        { keyId: string; period?: { end: number; start: number } },
-        { lastUsedAt?: number; remaining?: number; total: number },
+        { keyId: string; ownerId: string },
+        { remaining?: number; total: number },
         Name
       >;
       list: FunctionReference<

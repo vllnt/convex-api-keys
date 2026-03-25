@@ -1,16 +1,17 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server.js";
 import { components } from "./_generated/api.js";
-import { RateLimiter, MINUTE, HOUR } from "@convex-dev/rate-limiter";
 import { ShardedCounter } from "@convex-dev/sharded-counter";
 import {
-  KEY_STATUS,
   KEY_TYPE,
   TERMINAL_STATUSES,
   parseKeyString,
   timingSafeEqual,
   sha256Hex,
   validateTags,
+  validateKeyPrefix,
+  validateEnv,
+  validateSizeLimits,
   KEY_PREFIX_SEPARATOR,
 } from "../shared.js";
 import { createLogger } from "../log.js";
@@ -19,12 +20,15 @@ import type { KeyStatus } from "../shared.js";
 
 const log = createLogger("api-keys");
 
-const rateLimiter = new RateLimiter(components.rateLimiter, {
-  createKey: { kind: "fixed window", rate: 100, period: HOUR },
-  validateKey: { kind: "token bucket", rate: 1000, period: MINUTE },
-});
-
 const counter = new ShardedCounter(components.shardedCounter);
+
+function generateRandomHex(length: number): string {
+  const bytes = new Uint8Array(length / 2);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 export const create = mutation({
   args: {
@@ -38,9 +42,6 @@ export const create = mutation({
     remaining: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     keyPrefix: v.optional(v.string()),
-    lookupPrefix: v.string(),
-    secretHex: v.string(),
-    hash: v.string(),
   },
   returns: v.object({
     keyId: v.id("apiKeys"),
@@ -57,19 +58,25 @@ export const create = mutation({
       validateTags(args.tags);
     }
 
-    await rateLimiter.limit(ctx, "createKey", {
-      key: args.ownerId,
-      throws: true,
-    });
+    const prefix = args.keyPrefix ?? "vk";
+    validateKeyPrefix(prefix);
+    const env = args.env ?? "live";
+    validateEnv(env);
+    validateSizeLimits({ metadata: args.metadata, scopes: args.scopes, tags: args.tags, name: args.name });
 
     const type = args.type ?? "secret";
-    const env = args.env ?? "live";
-    const prefix = args.keyPrefix ?? "vk";
     const typeShort = type === "publishable" ? "pub" : "secret";
 
+    const lookupPrefix = generateRandomHex(8);
+    const secretHex = generateRandomHex(64);
+    const rawKey = [prefix, typeShort, env, lookupPrefix, secretHex].join(
+      KEY_PREFIX_SEPARATOR,
+    );
+    const hash = await sha256Hex(rawKey);
+
     const keyId = await ctx.db.insert("apiKeys", {
-      hash: args.hash,
-      lookupPrefix: args.lookupPrefix,
+      hash,
+      lookupPrefix,
       keyPrefix: prefix,
       type,
       env,
@@ -83,21 +90,12 @@ export const create = mutation({
       expiresAt: args.expiresAt,
     });
 
-    await ctx.db.insert("apiKeyEvents", {
-      keyId,
-      ownerId: args.ownerId,
-      eventType: "key.created",
-      timestamp: Date.now(),
-    });
-
-    const rawKey = [prefix, typeShort, env, args.lookupPrefix, args.secretHex].join(
-      KEY_PREFIX_SEPARATOR,
-    );
-
-    log.info("key created", { keyId, ownerId: args.ownerId, type, env });
+    log.info("key.created", { keyId, ownerId: args.ownerId, type, env });
     return { keyId, key: rawKey };
   },
 });
+
+const LAST_USED_AT_THROTTLE_MS = 60_000;
 
 export const validate = mutation({
   args: {
@@ -118,12 +116,12 @@ export const validate = mutation({
     v.object({
       valid: v.literal(false),
       reason: v.string(),
-      retryAfter: v.optional(v.number()),
     }),
   ),
   handler: async (ctx, { key }) => {
     const parsed = parseKeyString(key);
     if (!parsed.valid) {
+      log.info("key.validate_failed", { reason: "malformed" });
       return { valid: false as const, reason: "malformed" };
     }
 
@@ -133,6 +131,7 @@ export const validate = mutation({
       .collect();
 
     if (candidates.length === 0) {
+      log.info("key.validate_failed", { reason: "not_found", lookupPrefix: parsed.lookupPrefix });
       return { valid: false as const, reason: "not_found" };
     }
 
@@ -147,45 +146,30 @@ export const validate = mutation({
     }
 
     if (!matchedKey) {
+      log.info("key.validate_failed", { reason: "not_found", lookupPrefix: parsed.lookupPrefix });
       return { valid: false as const, reason: "not_found" };
     }
 
     const now = Date.now();
 
     if (matchedKey.status === "revoked") {
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.validate_failed",
-        reason: "revoked",
-        timestamp: now,
-      });
+      log.info("key.validate_failed", { keyId: matchedKey._id, reason: "revoked" });
       return { valid: false as const, reason: "revoked" };
     }
 
     if (matchedKey.status === "disabled") {
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.validate_failed",
-        reason: "disabled",
-        timestamp: now,
-      });
+      log.info("key.validate_failed", { keyId: matchedKey._id, reason: "disabled" });
       return { valid: false as const, reason: "disabled" };
     }
 
     if (matchedKey.status === "exhausted") {
+      log.info("key.validate_failed", { keyId: matchedKey._id, reason: "exhausted" });
       return { valid: false as const, reason: "exhausted" };
     }
 
     if (matchedKey.expiresAt && matchedKey.expiresAt <= now) {
       await ctx.db.patch(matchedKey._id, { status: "expired" });
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.expired",
-        timestamp: now,
-      });
+      log.info("key.expired", { keyId: matchedKey._id });
       return { valid: false as const, reason: "expired" };
     }
 
@@ -195,13 +179,7 @@ export const validate = mutation({
       matchedKey.gracePeriodEnd <= now
     ) {
       await ctx.db.patch(matchedKey._id, { status: "expired" });
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.expired",
-        reason: "grace_period_ended",
-        timestamp: now,
-      });
+      log.info("key.expired", { keyId: matchedKey._id, reason: "grace_period_ended" });
       return { valid: false as const, reason: "expired" };
     }
 
@@ -209,58 +187,35 @@ export const validate = mutation({
     if (matchedKey.remaining !== undefined) {
       if (matchedKey.remaining <= 0) {
         await ctx.db.patch(matchedKey._id, { status: "exhausted" });
-        await ctx.db.insert("apiKeyEvents", {
-          keyId: matchedKey._id,
-          ownerId: matchedKey.ownerId,
-          eventType: "key.exhausted",
-          timestamp: now,
-        });
+        log.info("key.exhausted", { keyId: matchedKey._id });
         return { valid: false as const, reason: "exhausted" };
       }
       newRemaining = matchedKey.remaining - 1;
-      const updates: Record<string, unknown> = {
-        remaining: newRemaining,
-        lastUsedAt: now,
-      };
-      if (newRemaining === 0) {
-        updates.status = "exhausted";
-      }
-      await ctx.db.patch(matchedKey._id, updates);
-
-      if (newRemaining === 0) {
-        await ctx.db.insert("apiKeyEvents", {
-          keyId: matchedKey._id,
-          ownerId: matchedKey.ownerId,
-          eventType: "key.exhausted",
-          timestamp: now,
-        });
-      }
-    } else {
-      await ctx.db.patch(matchedKey._id, { lastUsedAt: now });
     }
 
-    const { ok, retryAfter } = await rateLimiter.limit(ctx, "validateKey", {
-      key: matchedKey._id,
-      throws: false,
-    });
-    if (!ok) {
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.rate_limited",
-        timestamp: now,
-      });
-      return { valid: false as const, reason: "rate_limited", retryAfter };
+    const shouldUpdateLastUsed =
+      !matchedKey.lastUsedAt || now - matchedKey.lastUsedAt >= LAST_USED_AT_THROTTLE_MS;
+
+    const patch: Record<string, unknown> = {};
+    if (newRemaining !== matchedKey.remaining) {
+      patch.remaining = newRemaining;
+      if (newRemaining === 0) {
+        patch.status = "exhausted";
+      }
+    }
+    if (shouldUpdateLastUsed) {
+      patch.lastUsedAt = now;
+    }
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(matchedKey._id, patch);
+    }
+    if (newRemaining === 0) {
+      log.info("key.exhausted", { keyId: matchedKey._id });
     }
 
     await counter.add(ctx, matchedKey._id, 1);
 
-    await ctx.db.insert("apiKeyEvents", {
-      keyId: matchedKey._id,
-      ownerId: matchedKey.ownerId,
-      eventType: "key.validated",
-      timestamp: now,
-    });
+    log.info("key.validated", { keyId: matchedKey._id, ownerId: matchedKey.ownerId });
 
     return {
       valid: true as const,
@@ -279,24 +234,22 @@ export const validate = mutation({
 export const revoke = mutation({
   args: {
     keyId: v.id("apiKeys"),
+    ownerId: v.string(),
   },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
+  handler: async (ctx, { keyId, ownerId }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
+    }
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
     if (key.status === "revoked") {
       return null;
     }
     await ctx.db.patch(keyId, { status: "revoked", revokedAt: Date.now() });
-    await ctx.db.insert("apiKeyEvents", {
-      keyId,
-      ownerId: key.ownerId,
-      eventType: "key.revoked",
-      timestamp: Date.now(),
-    });
-    log.info("key revoked", { keyId, ownerId: key.ownerId });
+    log.info("key.revoked", { keyId, ownerId });
     return null;
   },
 });
@@ -308,36 +261,41 @@ export const revokeByTag = mutation({
   },
   returns: v.object({ revokedCount: v.number() }),
   handler: async (ctx, { ownerId, tag }) => {
-    const keys = await ctx.db
+    const activeKeys = await ctx.db
       .query("apiKeys")
       .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId).eq("status", "active"))
       .collect();
+    const rotatingKeys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId).eq("status", "rotating"))
+      .collect();
+    const disabledKeys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId).eq("status", "disabled"))
+      .collect();
 
+    const allKeys = [...activeKeys, ...rotatingKeys, ...disabledKeys];
     let revokedCount = 0;
     const now = Date.now();
-    for (const key of keys) {
+    for (const key of allKeys) {
       if (key.tags.includes(tag)) {
         await ctx.db.patch(key._id, { status: "revoked", revokedAt: now });
-        await ctx.db.insert("apiKeyEvents", {
-          keyId: key._id,
-          ownerId,
-          eventType: "key.revoked",
-          reason: `bulk_revoke_by_tag:${tag}`,
-          timestamp: now,
-        });
         revokedCount++;
       }
     }
+    log.info("key.bulk_revoked", { ownerId, tag, revokedCount });
     return { revokedCount };
   },
 });
 
+const MIN_GRACE_PERIOD_MS = 60_000;
+const MAX_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const rotate = mutation({
   args: {
     keyId: v.id("apiKeys"),
+    ownerId: v.string(),
     gracePeriodMs: v.optional(v.number()),
-    lookupPrefix: v.string(),
-    secretHex: v.string(),
   },
   returns: v.object({
     newKeyId: v.id("apiKeys"),
@@ -349,12 +307,21 @@ export const rotate = mutation({
     if (!oldKey) {
       throw new Error("key not found");
     }
+    if (oldKey.ownerId !== args.ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
+    }
     if (TERMINAL_STATUSES.has(oldKey.status as KeyStatus)) {
       throw new Error("cannot rotate a terminal key");
     }
 
-    const now = Date.now();
     const gracePeriodMs = args.gracePeriodMs ?? 3600000;
+    if (gracePeriodMs < MIN_GRACE_PERIOD_MS || gracePeriodMs > MAX_GRACE_PERIOD_MS) {
+      throw new Error(
+        `gracePeriodMs must be between ${MIN_GRACE_PERIOD_MS} (60s) and ${MAX_GRACE_PERIOD_MS} (30 days)`,
+      );
+    }
+
+    const now = Date.now();
     const gracePeriodEnd = now + gracePeriodMs;
 
     await ctx.db.patch(args.keyId, {
@@ -363,18 +330,20 @@ export const rotate = mutation({
     });
 
     const typeShort = oldKey.type === "publishable" ? "pub" : "secret";
+    const lookupPrefix = generateRandomHex(8);
+    const secretHex = generateRandomHex(64);
     const rawKey = [
       oldKey.keyPrefix,
       typeShort,
       oldKey.env,
-      args.lookupPrefix,
-      args.secretHex,
+      lookupPrefix,
+      secretHex,
     ].join(KEY_PREFIX_SEPARATOR);
     const hash = await sha256Hex(rawKey);
 
     const newKeyId = await ctx.db.insert("apiKeys", {
       hash,
-      lookupPrefix: args.lookupPrefix,
+      lookupPrefix,
       keyPrefix: oldKey.keyPrefix,
       type: oldKey.type,
       env: oldKey.env,
@@ -389,14 +358,7 @@ export const rotate = mutation({
       rotatedFromId: args.keyId,
     });
 
-    await ctx.db.insert("apiKeyEvents", {
-      keyId: args.keyId,
-      ownerId: oldKey.ownerId,
-      eventType: "key.rotated",
-      metadata: { newKeyId },
-      timestamp: now,
-    });
-
+    log.info("key.rotated", { keyId: args.keyId, newKeyId, ownerId: oldKey.ownerId });
     return { newKeyId, newKey: rawKey, oldKeyExpiresAt: gracePeriodEnd };
   },
 });
@@ -404,16 +366,20 @@ export const rotate = mutation({
 export const update = mutation({
   args: {
     keyId: v.id("apiKeys"),
+    ownerId: v.string(),
     name: v.optional(v.string()),
     scopes: v.optional(v.array(v.string())),
     tags: v.optional(v.array(v.string())),
     metadata: v.optional(jsonValue),
   },
   returns: v.null(),
-  handler: async (ctx, { keyId, ...updates }) => {
+  handler: async (ctx, { keyId, ownerId, ...updates }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
+    }
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
     if (TERMINAL_STATUSES.has(key.status as KeyStatus)) {
       throw new Error("cannot update terminal key");
@@ -421,6 +387,7 @@ export const update = mutation({
     if (updates.tags) {
       validateTags(updates.tags);
     }
+    validateSizeLimits({ metadata: updates.metadata, scopes: updates.scopes, tags: updates.tags, name: updates.name });
 
     const patch: Record<string, unknown> = {};
     if (updates.name !== undefined) patch.name = updates.name;
@@ -430,13 +397,7 @@ export const update = mutation({
 
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(keyId, patch);
-      await ctx.db.insert("apiKeyEvents", {
-        keyId,
-        ownerId: key.ownerId,
-        eventType: "key.updated",
-        metadata: { fields: Object.keys(patch) },
-        timestamp: Date.now(),
-      });
+      log.info("key.updated", { keyId, ownerId, fields: Object.keys(patch) });
     }
 
     return null;
@@ -444,12 +405,18 @@ export const update = mutation({
 });
 
 export const disable = mutation({
-  args: { keyId: v.id("apiKeys") },
+  args: {
+    keyId: v.id("apiKeys"),
+    ownerId: v.string(),
+  },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
+  handler: async (ctx, { keyId, ownerId }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
+    }
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
     if (key.status === "disabled") {
       return null;
@@ -458,23 +425,24 @@ export const disable = mutation({
       throw new Error("can only disable active keys");
     }
     await ctx.db.patch(keyId, { status: "disabled" });
-    await ctx.db.insert("apiKeyEvents", {
-      keyId,
-      ownerId: key.ownerId,
-      eventType: "key.disabled",
-      timestamp: Date.now(),
-    });
+    log.info("key.disabled", { keyId, ownerId });
     return null;
   },
 });
 
 export const enable = mutation({
-  args: { keyId: v.id("apiKeys") },
+  args: {
+    keyId: v.id("apiKeys"),
+    ownerId: v.string(),
+  },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
+  handler: async (ctx, { keyId, ownerId }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
+    }
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
     if (key.status === "active") {
       return null;
@@ -483,12 +451,7 @@ export const enable = mutation({
       throw new Error("can only enable disabled keys");
     }
     await ctx.db.patch(keyId, { status: "active" });
-    await ctx.db.insert("apiKeyEvents", {
-      keyId,
-      ownerId: key.ownerId,
-      eventType: "key.enabled",
-      timestamp: Date.now(),
-    });
+    log.info("key.enabled", { keyId, ownerId });
     return null;
   },
 });
@@ -500,12 +463,25 @@ export const configure = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    if (args.cleanupIntervalMs !== undefined && args.cleanupIntervalMs <= 0) {
+      throw new Error("cleanupIntervalMs must be > 0");
+    }
+    if (args.defaultExpiryMs !== undefined && args.defaultExpiryMs <= 0) {
+      throw new Error("defaultExpiryMs must be > 0");
+    }
+
     const existing = await ctx.db.query("config").first();
+    const oldValues = existing
+      ? { cleanupIntervalMs: existing.cleanupIntervalMs, defaultExpiryMs: existing.defaultExpiryMs }
+      : {};
+
     if (existing) {
       await ctx.db.patch(existing._id, args);
     } else {
       await ctx.db.insert("config", args);
     }
+
+    log.info("config.updated", { old: oldValues, new: args });
     return null;
   },
 });
