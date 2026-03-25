@@ -1,6 +1,5 @@
 import type { GenericMutationCtx, GenericQueryCtx, GenericDataModel } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
-import { sha256Hex } from "../shared.js";
 import type {
   CreateKeyOptions,
   CreateKeyResult,
@@ -31,14 +30,6 @@ export interface ApiKeysConfig {
   defaultType?: KeyType;
 }
 
-function generateRandomHex(length: number): string {
-  const bytes = new Uint8Array(length / 2);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 export class ApiKeys {
   public component: ComponentApi;
   private prefix: string;
@@ -54,30 +45,17 @@ export class ApiKeys {
     ctx: RunMutationCtx,
     options: CreateKeyOptions,
   ): Promise<CreateKeyResult> {
-    const type = options.type ?? this.defaultType;
-    const typeShort = type === "publishable" ? "pub" : "secret";
-    const env = options.env ?? "live";
-
-    const lookupPrefix = generateRandomHex(8);
-    const secretHex = generateRandomHex(64);
-
-    const rawKey = [this.prefix, typeShort, env, lookupPrefix, secretHex].join("_");
-    const hash = await sha256Hex(rawKey);
-
     const result = await ctx.runMutation(this.component.mutations.create, {
       name: options.name,
       ownerId: options.ownerId,
-      type,
+      type: options.type ?? this.defaultType,
       scopes: options.scopes,
       tags: options.tags,
-      env,
+      env: options.env ?? "live",
       metadata: options.metadata,
       remaining: options.remaining,
       expiresAt: options.expiresAt,
       keyPrefix: this.prefix,
-      lookupPrefix,
-      secretHex,
-      hash,
     });
 
     return { keyId: result.keyId as string, key: result.key };
@@ -93,8 +71,11 @@ export class ApiKeys {
     ) as ValidationResult;
   }
 
-  async revoke(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.mutations.revoke, { keyId: args.keyId });
+  async revoke(ctx: RunMutationCtx, args: { keyId: string; ownerId: string }): Promise<void> {
+    await ctx.runMutation(this.component.mutations.revoke, {
+      keyId: args.keyId,
+      ownerId: args.ownerId,
+    });
   }
 
   async revokeByTag(
@@ -106,16 +87,12 @@ export class ApiKeys {
 
   async rotate(
     ctx: RunMutationCtx,
-    args: { keyId: string; gracePeriodMs?: number },
+    args: { keyId: string; ownerId: string; gracePeriodMs?: number },
   ): Promise<RotateResult> {
-    const lookupPrefix = generateRandomHex(8);
-    const secretHex = generateRandomHex(64);
-
     return await ctx.runMutation(this.component.mutations.rotate, {
       keyId: args.keyId,
+      ownerId: args.ownerId,
       gracePeriodMs: args.gracePeriodMs,
-      lookupPrefix,
-      secretHex,
     }) as RotateResult;
   }
 
@@ -143,6 +120,7 @@ export class ApiKeys {
     ctx: RunMutationCtx,
     args: {
       keyId: string;
+      ownerId: string;
       name?: string;
       scopes?: string[];
       tags?: string[];
@@ -151,6 +129,7 @@ export class ApiKeys {
   ): Promise<void> {
     await ctx.runMutation(this.component.mutations.update, {
       keyId: args.keyId,
+      ownerId: args.ownerId,
       name: args.name,
       scopes: args.scopes,
       tags: args.tags,
@@ -158,21 +137,27 @@ export class ApiKeys {
     });
   }
 
-  async disable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.mutations.disable, { keyId: args.keyId });
+  async disable(ctx: RunMutationCtx, args: { keyId: string; ownerId: string }): Promise<void> {
+    await ctx.runMutation(this.component.mutations.disable, {
+      keyId: args.keyId,
+      ownerId: args.ownerId,
+    });
   }
 
-  async enable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.mutations.enable, { keyId: args.keyId });
+  async enable(ctx: RunMutationCtx, args: { keyId: string; ownerId: string }): Promise<void> {
+    await ctx.runMutation(this.component.mutations.enable, {
+      keyId: args.keyId,
+      ownerId: args.ownerId,
+    });
   }
 
   async getUsage(
     ctx: RunQueryCtx,
-    args: { keyId: string; period?: { start: number; end: number } },
+    args: { keyId: string; ownerId: string },
   ): Promise<UsageStats> {
     return await ctx.runQuery(this.component.queries.getUsage, {
       keyId: args.keyId,
-      period: args.period,
+      ownerId: args.ownerId,
     }) as UsageStats;
   }
 

@@ -8,7 +8,7 @@ Convex agent skills for common tasks can be installed by running `npx convex ai-
 
 ## Project Overview
 
-`@vllnt/convex-api-keys` is a Convex component for secure API key management. It provides create, validate, revoke, rotate, rate-limit, and usage tracking — all backed by `@convex-dev/*` ecosystem components.
+`@vllnt/convex-api-keys` is a Convex component for secure API key management. It provides create, validate, revoke, rotate, and usage tracking — with built-in auth boundaries and structured audit logging. Single child component: `@convex-dev/sharded-counter`.
 
 ## Architecture
 
@@ -24,17 +24,21 @@ src/
     ├── mutations.ts        # Mutations (create, validate, revoke, rotate, update, disable, enable, configure)
     ├── queries.ts          # Queries (list, listByTag, getUsage)
     ├── validators.ts       # Shared validators (jsonValue alias for v.any())
-    ├── schema.ts           # Convex schema (apiKeys, apiKeyEvents, config tables)
-    └── convex.config.ts    # Component config (rate-limiter, sharded-counter, aggregate, crons)
+    ├── schema.ts           # Convex schema (apiKeys, config tables)
+    └── convex.config.ts    # Component config (sharded-counter only)
 ```
 
 ## Key Design Decisions
 
-- **Hash computed server-side**: `rotate()` in `mutations.ts` computes the SHA-256 hash inside the component mutation (not the client) to ensure the hash always matches the old key's actual type/env.
+- **Secret material generated server-side**: Both `create()` and `rotate()` generate lookupPrefix, secretHex, and hash inside the component mutation — never passed from client.
+- **Auth boundary via ownerId**: All admin mutations (revoke, disable, enable, update, rotate, getUsage) require `ownerId` and assert it matches the key's owner before any state change.
+- **No event table**: Audit trail via structured logging (`log.ts`), not a DB table. Eliminates unbounded growth, O(N) scans, and retention complexity.
+- **No rate limiting**: Rate limiting is the integrator's responsibility at their HTTP layer with real caller context.
 - **Namespace separation**: Mutations in `mutations.ts`, queries in `queries.ts` — enforced by `@vllnt/eslint-config/convex`.
 - **No bare `v.any()`**: All uses aliased as `jsonValue` in `validators.ts`.
 - **Prefix-indexed lookup**: Keys use an 8-char `lookupPrefix` for O(1) candidate lookup, then constant-time hash comparison.
 - **No raw keys stored**: Only SHA-256 hashes persist. Raw keys are returned once at creation.
+- **Input validation**: keyPrefix (`^[a-zA-Z0-9]+$`), env (`^[a-zA-Z0-9-]+$`), metadata (4KB), scopes (50), tags (20), gracePeriodMs (60s-30d).
 
 ## Development
 

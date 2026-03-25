@@ -26,32 +26,59 @@ export const TERMINAL_STATUSES: ReadonlySet<KeyStatus> = new Set([
 ]);
 
 export const TAG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]*$/;
+export const KEY_PREFIX_PATTERN = /^[a-zA-Z0-9]+$/;
+export const ENV_PATTERN = /^[a-zA-Z0-9-]+$/;
 
-export const EVENT_TYPE = v.union(
-  v.literal("key.created"),
-  v.literal("key.validated"),
-  v.literal("key.validate_failed"),
-  v.literal("key.revoked"),
-  v.literal("key.rotated"),
-  v.literal("key.expired"),
-  v.literal("key.exhausted"),
-  v.literal("key.disabled"),
-  v.literal("key.enabled"),
-  v.literal("key.updated"),
-  v.literal("key.rate_limited"),
-);
-export type EventType =
-  | "key.created"
-  | "key.validated"
-  | "key.validate_failed"
-  | "key.revoked"
-  | "key.rotated"
-  | "key.expired"
-  | "key.exhausted"
-  | "key.disabled"
-  | "key.enabled"
-  | "key.updated"
-  | "key.rate_limited";
+export const MAX_METADATA_SIZE = 4096;
+export const MAX_SCOPES = 50;
+export const MAX_TAGS = 20;
+export const MAX_STRING_LENGTH = 256;
+
+export function validateKeyPrefix(prefix: string): void {
+  if (!KEY_PREFIX_PATTERN.test(prefix)) {
+    throw new Error(
+      `Invalid keyPrefix "${prefix}": must match ^[a-zA-Z0-9]+$ (alphanumeric only, no underscores)`,
+    );
+  }
+  if (prefix.length > MAX_STRING_LENGTH) {
+    throw new Error(`keyPrefix must be <= ${MAX_STRING_LENGTH} characters`);
+  }
+}
+
+export function validateEnv(env: string): void {
+  if (!ENV_PATTERN.test(env)) {
+    throw new Error(
+      `Invalid env "${env}": must match ^[a-zA-Z0-9-]+$ (no underscores — would break key parsing)`,
+    );
+  }
+  if (env.length > MAX_STRING_LENGTH) {
+    throw new Error(`env must be <= ${MAX_STRING_LENGTH} characters`);
+  }
+}
+
+export function validateSizeLimits(args: {
+  metadata?: unknown;
+  scopes?: string[];
+  tags?: string[];
+  name?: string;
+}): void {
+  if (args.metadata !== undefined) {
+    const size = JSON.stringify(args.metadata).length;
+    if (size > MAX_METADATA_SIZE) {
+      throw new Error(`metadata must be <= ${MAX_METADATA_SIZE} bytes (got ${size})`);
+    }
+  }
+  if (args.scopes && args.scopes.length > MAX_SCOPES) {
+    throw new Error(`scopes must have <= ${MAX_SCOPES} entries (got ${args.scopes.length})`);
+  }
+  if (args.tags && args.tags.length > MAX_TAGS) {
+    throw new Error(`tags must have <= ${MAX_TAGS} entries (got ${args.tags.length})`);
+  }
+  if (args.name && args.name.length > MAX_STRING_LENGTH) {
+    throw new Error(`name must be <= ${MAX_STRING_LENGTH} characters`);
+  }
+}
+
 
 export function validateTag(tag: string): void {
   if (!TAG_PATTERN.test(tag)) {

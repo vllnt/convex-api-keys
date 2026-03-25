@@ -7,30 +7,52 @@ import { jsonValue } from "./validators.js";
 
 const counter = new ShardedCounter(components.shardedCounter);
 
+const DEFAULT_PAGE_SIZE = 100;
+
+const keyItemValidator = v.object({
+  keyId: v.id("apiKeys"),
+  name: v.string(),
+  lookupPrefix: v.string(),
+  type: KEY_TYPE,
+  env: v.string(),
+  scopes: v.array(v.string()),
+  tags: v.array(v.string()),
+  status: KEY_STATUS,
+  metadata: v.optional(jsonValue),
+  remaining: v.optional(v.number()),
+  expiresAt: v.optional(v.number()),
+  createdAt: v.number(),
+  lastUsedAt: v.optional(v.number()),
+});
+
+function mapKey(k: any) {
+  return {
+    keyId: k._id,
+    name: k.name,
+    lookupPrefix: k.lookupPrefix,
+    type: k.type,
+    env: k.env,
+    scopes: k.scopes,
+    tags: k.tags,
+    status: k.status,
+    metadata: k.metadata,
+    remaining: k.remaining,
+    expiresAt: k.expiresAt,
+    createdAt: k._creationTime,
+    lastUsedAt: k.lastUsedAt,
+  };
+}
+
 export const list = query({
   args: {
     ownerId: v.string(),
     env: v.optional(v.string()),
     status: v.optional(KEY_STATUS),
+    limit: v.optional(v.number()),
   },
-  returns: v.array(
-    v.object({
-      keyId: v.id("apiKeys"),
-      name: v.string(),
-      lookupPrefix: v.string(),
-      type: KEY_TYPE,
-      env: v.string(),
-      scopes: v.array(v.string()),
-      tags: v.array(v.string()),
-      status: KEY_STATUS,
-      metadata: v.optional(jsonValue),
-      remaining: v.optional(v.number()),
-      expiresAt: v.optional(v.number()),
-      createdAt: v.number(),
-      lastUsedAt: v.optional(v.number()),
-    }),
-  ),
-  handler: async (ctx, { ownerId, env, status }) => {
+  returns: v.array(keyItemValidator),
+  handler: async (ctx, { ownerId, env, status, limit }) => {
+    const pageSize = limit ?? DEFAULT_PAGE_SIZE;
     let keysQuery;
     if (env) {
       keysQuery = ctx.db
@@ -51,23 +73,8 @@ export const list = query({
         .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId));
     }
 
-    const keys = await keysQuery.collect();
-
-    return keys.map((k) => ({
-      keyId: k._id,
-      name: k.name,
-      lookupPrefix: k.lookupPrefix,
-      type: k.type,
-      env: k.env,
-      scopes: k.scopes,
-      tags: k.tags,
-      status: k.status,
-      metadata: k.metadata,
-      remaining: k.remaining,
-      expiresAt: k.expiresAt,
-      createdAt: k._creationTime,
-      lastUsedAt: k.lastUsedAt,
-    }));
+    const keys = await keysQuery.take(pageSize);
+    return keys.map(mapKey);
   },
 });
 
@@ -75,88 +82,46 @@ export const listByTag = query({
   args: {
     ownerId: v.string(),
     tag: v.string(),
+    limit: v.optional(v.number()),
   },
-  returns: v.array(
-    v.object({
-      keyId: v.id("apiKeys"),
-      name: v.string(),
-      lookupPrefix: v.string(),
-      type: KEY_TYPE,
-      env: v.string(),
-      scopes: v.array(v.string()),
-      tags: v.array(v.string()),
-      status: KEY_STATUS,
-      metadata: v.optional(jsonValue),
-      remaining: v.optional(v.number()),
-      expiresAt: v.optional(v.number()),
-      createdAt: v.number(),
-      lastUsedAt: v.optional(v.number()),
-    }),
-  ),
-  handler: async (ctx, { ownerId, tag }) => {
-    const keys = await ctx.db
+  returns: v.array(keyItemValidator),
+  handler: async (ctx, { ownerId, tag, limit }) => {
+    const pageSize = limit ?? DEFAULT_PAGE_SIZE;
+    const allKeys = await ctx.db
       .query("apiKeys")
       .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId))
       .collect();
 
-    return keys
+    return allKeys
       .filter((k) => k.tags.includes(tag))
-      .map((k) => ({
-        keyId: k._id,
-        name: k.name,
-        lookupPrefix: k.lookupPrefix,
-        type: k.type,
-        env: k.env,
-        scopes: k.scopes,
-        tags: k.tags,
-        status: k.status,
-        metadata: k.metadata,
-        remaining: k.remaining,
-        expiresAt: k.expiresAt,
-        createdAt: k._creationTime,
-        lastUsedAt: k.lastUsedAt,
-      }));
+      .slice(0, pageSize)
+      .map(mapKey);
   },
 });
 
 export const getUsage = query({
   args: {
     keyId: v.id("apiKeys"),
-    period: v.optional(
-      v.object({
-        start: v.number(),
-        end: v.number(),
-      }),
-    ),
+    ownerId: v.string(),
   },
   returns: v.object({
     total: v.number(),
     remaining: v.optional(v.number()),
-    lastUsedAt: v.optional(v.number()),
   }),
-  handler: async (ctx, { keyId, period }) => {
+  handler: async (ctx, { keyId, ownerId }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
     }
-
-    let total: number;
-    if (period) {
-      const events = await ctx.db
-        .query("apiKeyEvents")
-        .withIndex("by_key", (q) =>
-          q.eq("keyId", keyId).gte("timestamp", period.start).lte("timestamp", period.end),
-        )
-        .collect();
-      total = events.filter((e) => e.eventType === "key.validated").length;
-    } else {
-      total = await counter.count(ctx, keyId);
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
+
+    const total = await counter.count(ctx, keyId);
 
     return {
       total,
       remaining: key.remaining,
-      lastUsedAt: key.lastUsedAt,
     };
   },
 });
