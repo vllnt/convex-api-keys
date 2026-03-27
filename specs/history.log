@@ -1,1 +1,2 @@
 2026-03-25 | shipped | v0.2.0-production-hardening | 14h→4h | ~4h | Auth boundary, server-side secret gen, remove events+rate-limiter, input validation, pagination. 82 tests, PR #37.
+2026-03-27 | shipped | ts2589-type-depth | 1h→0.5h | ~20m | Remove 3 stale sub-component refs from _generated/api.ts + phantom deps from package.json. Fixes #38.
