@@ -8,15 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@convex-dev/aggregate':
-        specifier: ^0.2.0
-        version: 0.2.1(convex@1.34.0)
-      '@convex-dev/crons':
-        specifier: ^0.2.0
-        version: 0.2.0(convex@1.34.0)
-      '@convex-dev/rate-limiter':
-        specifier: ^0.3.0
-        version: 0.3.2(convex@1.34.0)
       '@convex-dev/sharded-counter':
         specifier: ^0.2.0
         version: 0.2.0(convex@1.34.0)
@@ -122,29 +113,10 @@ packages:
     resolution: {integrity: sha512-W65Gum02liMd3hmNrLmDBX1u5BmRMcunouFjLXyhxHnNY4YlK1kTxsgfflZ5XBGSnPnO0MkiUzAcoGzYrlx0RQ==}
     engines: {node: '>=18.18'}
 
-  '@convex-dev/aggregate@0.2.1':
-    resolution: {integrity: sha512-z8GeUC+cIZEgtMXecX6WTBQHNW4E2ioRsc5IkO8BWnCjgDOru/Mw8zXe9JPe35JkqDjlSVKuwxiQHKs/jaYAyA==}
-    peerDependencies:
-      convex: ^1.24.8
-
-  '@convex-dev/crons@0.2.0':
-    resolution: {integrity: sha512-JowF/DDPl8FuhXml2/0jmEa6uIKr/UK1UwP+FdbPt2BRVxACRX4CNlzDQEtHbO2p2FVKiJh4zEg8p5/YM27PEA==}
-    peerDependencies:
-      convex: ^1.24.8
-
   '@convex-dev/eslint-plugin@1.2.1':
     resolution: {integrity: sha512-2EfDq/jscJofSjZscPolVFa3SgfF2iwLtOBJdtI5C1089eHEgQ8bEuxbCVnRRuapAZxLXz17+8vHjPC4+hmyIQ==}
     peerDependencies:
       convex: ^1.31.7
-
-  '@convex-dev/rate-limiter@0.3.2':
-    resolution: {integrity: sha512-+oBPsBfFbzdxiF/9XaaTQmVnvDlvEfg/c69/v8LxTbw4VLuiflIKlfnPQL8OS0azXQQ11hcPWHmU8ytFmHKDXA==}
-    peerDependencies:
-      convex: ^1.24.8
-      react: ^18.2.0 || ^19.0.0
-    peerDependenciesMeta:
-      react:
-        optional: true
 
   '@convex-dev/sharded-counter@0.2.0':
     resolution: {integrity: sha512-Qv1TvFXyQ60rADS1fWH01mnMDNSPfmKKowXva6WxIXGIC2ta5xvohe9TfUhXp4AT1vtOXoFgse3Z9mJB9fJlSQ==}
@@ -1067,10 +1039,6 @@ packages:
   core-js-compat@3.49.0:
     resolution: {integrity: sha512-VQXt1jr9cBz03b331DFDCCP90b3fanciLkgiOoy8SBHy06gNf+vQ1A3WFLqG7I8TipYIKeYK9wxd0tUrvHcOZA==}
 
-  cron-parser@4.9.0:
-    resolution: {integrity: sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==}
-    engines: {node: '>=12.0.0'}
-
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
@@ -1739,10 +1707,6 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
-
-  luxon@3.7.2:
-    resolution: {integrity: sha512-vtEhXh/gNjI9Yg1u4jX/0YVPMvxzHuGgCm6tC5kZyb08yjGWGnqAjGJvcXbqQR2P3MyMEFnRbpcdFS6PBcLqew==}
-    engines: {node: '>=12'}
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -2443,15 +2407,6 @@ snapshots:
       - eslint-import-resolver-webpack
       - supports-color
 
-  '@convex-dev/aggregate@0.2.1(convex@1.34.0)':
-    dependencies:
-      convex: 1.34.0
-
-  '@convex-dev/crons@0.2.0(convex@1.34.0)':
-    dependencies:
-      convex: 1.34.0
-      cron-parser: 4.9.0
-
   '@convex-dev/eslint-plugin@1.2.1(convex@1.34.0)(eslint@9.39.4)(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/types': 8.49.0
@@ -2461,10 +2416,6 @@ snapshots:
       - eslint
       - supports-color
       - typescript
-
-  '@convex-dev/rate-limiter@0.3.2(convex@1.34.0)':
-    dependencies:
-      convex: 1.34.0
 
   '@convex-dev/sharded-counter@0.2.0(convex@1.34.0)':
     dependencies:
@@ -3249,10 +3200,6 @@ snapshots:
   core-js-compat@3.49.0:
     dependencies:
       browserslist: 4.28.1
-
-  cron-parser@4.9.0:
-    dependencies:
-      luxon: 3.7.2
 
   cross-spawn@7.0.6:
     dependencies:
@@ -4096,8 +4043,6 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
-
-  luxon@3.7.2: {}
 
   magic-string@0.30.21:
     dependencies:
