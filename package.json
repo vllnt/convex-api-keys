@@ -1,7 +1,7 @@
 {
   "name": "@vllnt/convex-api-keys",
-  "version": "0.1.1",
-  "description": "Convex component for secure API key management — create, validate, revoke, rotate, rate-limit, track usage",
+  "version": "0.2.0",
+  "description": "Convex component for secure API key management — create, validate, revoke, rotate, and track usage",
   "license": "Apache-2.0",
   "type": "module",
   "packageManager": "pnpm@9.15.4",
@@ -43,8 +43,8 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --typecheck --clearScreen false",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
-    "generate:llms": "node -e \"const{execSync:e}=require('child_process');const fs=require('fs');const files=['README.md','src/shared.ts','src/client/types.ts','src/client/index.ts','src/component/schema.ts','src/component/validators.ts','src/component/mutations.ts','src/component/queries.ts','src/test.ts'];let out='# @vllnt/convex-api-keys — Full Source\\n\\nAuto-generated. Do not edit manually.\\n';for(const f of files){out+='\\n---\\n\\n## '+f+'\\n\\n';if(f.endsWith('.md')){out+=fs.readFileSync(f,'utf8')}else{out+='\\`\\`\\`ts\\n'+fs.readFileSync(f,'utf8')+'\\`\\`\\`'}out+='\\n'}fs.writeFileSync('llms-full.txt',out)\"",
-    "preversion": "pnpm install --frozen-lockfile && pnpm build:clean && pnpm test && pnpm typecheck && pnpm generate:llms",
+    "generate:llms": "node -e \"const fs=require('fs');const files=['README.md','CHANGELOG.md','docs/API.md','src/shared.ts','src/client/types.ts','src/client/index.ts','src/component/schema.ts','src/component/validators.ts','src/component/mutations.ts','src/component/queries.ts','src/test.ts'];let out='# @vllnt/convex-api-keys — Full Source\\n\\nAuto-generated. Do not edit manually.\\n';for(const f of files){out+='\\n---\\n\\n## '+f+'\\n\\n';if(f.endsWith('.md')){out+=fs.readFileSync(f,'utf8')}else{out+='\\`\\`\\`ts\\n'+fs.readFileSync(f,'utf8')+'\\`\\`\\`'}out+='\\n'}fs.writeFileSync('llms-full.txt',out)\"",
+    "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm typecheck && pnpm generate:llms",
     "prepublishOnly": "npm whoami || npm login",
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
     "release": "npm version patch && npm publish && git push --follow-tags"
@@ -53,14 +53,14 @@
     "@convex-dev/sharded-counter": "^0.2.0"
   },
   "peerDependencies": {
-    "convex": "^1.33.0"
+    "convex": "^1.36.1"
   },
   "devDependencies": {
     "@edge-runtime/vm": "^4.0.0",
     "@vllnt/eslint-config": "^1.0.0",
     "@vllnt/typescript": "^1.0.0",
-    "convex": "^1.33.0",
-    "convex-test": "^0.0.36",
+    "convex": "^1.36.1",
+    "convex-test": "^0.0.50",
     "eslint": "^9.0.0",
     "prettier": "^3.4.0",
     "typescript": "^5.7.0",

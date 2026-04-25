@@ -4,6 +4,7 @@
 
 ### Breaking Changes
 
+- **Convex compatibility**: this release targets `convex@^1.36.1` and `convex-test@^0.0.50`.
 - **`create()` / `rotate()`**: Secret material (lookupPrefix, secretHex, hash) now generated server-side. Remove these from client args.
 - **Admin mutations** (`revoke`, `disable`, `enable`, `update`, `rotate`, `getUsage`): `ownerId` is now a required argument for auth boundary enforcement.
 - **`apiKeyEvents` table removed**: Audit trail replaced with structured logging (Convex dashboard). Export existing event data before upgrading.
@@ -53,6 +54,8 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 
 ### New Features
 
+- Public client wrapper now forwards optional `limit` to `list()` and `listByTag()`
+- `ValidationFailure` no longer advertises the removed `retryAfter` field
 - Auth boundary: `ownerId` cross-check on all admin mutations
 - Server-side secret generation for `create()` and `rotate()`
 - Input validation: keyPrefix charset, env charset, gracePeriodMs bounds (60s–30d), metadata size (4KB), scopes (50), tags (20)

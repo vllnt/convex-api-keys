@@ -14,9 +14,11 @@ Convex component for secure API key management.
 
 ```bash
 pnpm install
-pnpm build:codegen
+pnpm build
 pnpm test
 ```
+
+Use `pnpm build:codegen` only when regenerating checked-in Convex `_generated` files and you have access to the selected Convex project.
 
 ## Structure
 

@@ -6,11 +6,13 @@ Thanks for your interest in contributing!
 
 ```bash
 pnpm install
-pnpm build:codegen
+pnpm build
 pnpm typecheck
 pnpm lint
 pnpm test
 ```
+
+Use `pnpm build:codegen` only when you need to regenerate checked-in Convex `_generated` files and have access to the selected Convex project.
 
 ## Testing
 
@@ -39,6 +41,9 @@ pnpm test:watch    # watch mode
 ## Releases
 
 Maintainers only:
+
+- Preferred: use `.github/workflows/publish.yml` with `workflow_dispatch` for patch/minor/major releases.
+- Local scripts remain available for patch and alpha publishes:
 
 ```bash
 pnpm release       # patch bump + publish
