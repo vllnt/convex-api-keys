@@ -74,9 +74,6 @@ jobs:
 
       - run: pnpm build
 
-      - name: Upgrade npm for OIDC support
-        run: npm install -g npm@latest
-
       - name: Publish canary
         run: |
           sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
@@ -166,9 +163,6 @@ jobs:
           git commit -m "chore(release): v${{ steps.version.outputs.version }}"
           git tag -a "v${{ steps.version.outputs.version }}" -m "v${{ steps.version.outputs.version }}"
           git push origin main --follow-tags
-
-      - name: Upgrade npm for OIDC support
-        run: npm install -g npm@latest
 
       - name: Publish to npm
         run: |
