@@ -31,10 +31,17 @@ export interface ValidationSuccess {
   remaining?: number;
 }
 
+export type ValidationFailureReason =
+  | "malformed"
+  | "not_found"
+  | "revoked"
+  | "disabled"
+  | "expired"
+  | "exhausted";
+
 export interface ValidationFailure {
   valid: false;
-  reason: string;
-  retryAfter?: number;
+  reason: ValidationFailureReason;
 }
 
 export type ValidationResult = ValidationSuccess | ValidationFailure;

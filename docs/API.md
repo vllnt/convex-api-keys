@@ -2,6 +2,8 @@
 
 Full API reference for `@vllnt/convex-api-keys`.
 
+**Compatibility:** `convex@^1.36.1`
+
 ## ApiKeys Class
 
 ```ts

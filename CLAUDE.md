@@ -44,11 +44,13 @@ src/
 
 ```bash
 pnpm install
-pnpm build:codegen          # Generate Convex types + build
+pnpm build                  # Build the package
 pnpm typecheck              # Type check
 pnpm lint                   # ESLint
 pnpm test                   # vitest with convex-test + @edge-runtime/vm
 ```
+
+Use `pnpm build:codegen` only when regenerating checked-in Convex `_generated` files and you have access to the selected Convex project.
 
 ## Testing
 

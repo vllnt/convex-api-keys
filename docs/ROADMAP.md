@@ -1,5 +1,7 @@
 # Roadmap: @vllnt/convex-api-keys
 
+> Historical roadmap: derived from the pre-v0.2 audit and retained as archive context. Many Phase 1 hardening items shipped in the v0.2.0 line, including `ownerId` auth-boundary checks, server-side secret generation, structured audit logging, bounded list APIs, and removal of the internal rate-limiter / aggregate / crons architecture. Use `CHANGELOG.md`, open issues, and active PRs for current release planning.
+
 Derived from [DEEP-ANALYSIS.md](./DEEP-ANALYSIS.md) (2026-03-24, 6-perspective audit).
 
 ## Priority Legend
@@ -98,8 +100,6 @@ v2.0.0  Phase 4 complete — extensible ecosystem
 
 ## Status
 
-- [x] v0.1.0 shipped (2026-03-24) — feature-complete, 69 tests, OSS grade A
-- [ ] Phase 1 — not started
-- [ ] Phase 2 — not started
-- [ ] Phase 3 — not started
-- [ ] Phase 4 — not started
+- [x] v0.1.0 shipped (2026-03-24) — initial public release
+- [x] v0.2.0 release prep — hardening + docs/package sync + Convex `^1.36.1` compatibility
+- [ ] Remaining items below are historical backlog, not current release gates

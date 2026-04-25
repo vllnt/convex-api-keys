@@ -34,9 +34,13 @@ You install one package. The child component is internal — it doesn't appear i
 
 ## Installation
 
+Peer dependency: `convex@^1.36.1`
+
 ```bash
-npm install @vllnt/convex-api-keys
+npm install convex@^1.36.1 @vllnt/convex-api-keys
 ```
+
+If your app already depends on Convex, make sure it satisfies `^1.36.1`.
 
 Register in your `convex/convex.config.ts`:
 
@@ -100,8 +104,9 @@ const { keyId, ownerId, scopes, tags, env, type, metadata, remaining } = result;
 
 ```ts
 const keys = await apiKeys.list(ctx, { ownerId: orgId });
+const firstTwenty = await apiKeys.list(ctx, { ownerId: orgId, limit: 20 });
 const prodKeys = await apiKeys.list(ctx, { ownerId: orgId, env: "live" });
-const taggedKeys = await apiKeys.listByTag(ctx, { ownerId: orgId, tag: "sdk" });
+const taggedKeys = await apiKeys.listByTag(ctx, { ownerId: orgId, tag: "sdk", limit: 20 });
 ```
 
 ### Update metadata (without rotation)
