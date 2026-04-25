@@ -10,23 +10,23 @@ importers:
     dependencies:
       '@convex-dev/sharded-counter':
         specifier: ^0.2.0
-        version: 0.2.0(convex@1.34.0)
+        version: 0.2.0(convex@1.36.1)
     devDependencies:
       '@edge-runtime/vm':
         specifier: ^4.0.0
         version: 4.0.4
       '@vllnt/eslint-config':
         specifier: ^1.0.0
-        version: 1.0.0(@typescript-eslint/parser@8.57.1(eslint@9.39.4)(typescript@5.9.3))(convex@1.34.0)(eslint@9.39.4)(prettier@3.8.1)(turbo@2.8.20)(typescript@5.9.3)
+        version: 1.0.0(@typescript-eslint/parser@8.57.1(eslint@9.39.4)(typescript@5.9.3))(convex@1.36.1)(eslint@9.39.4)(prettier@3.8.1)(turbo@2.8.20)(typescript@5.9.3)
       '@vllnt/typescript':
         specifier: ^1.0.0
         version: 1.0.0
       convex:
-        specifier: ^1.33.0
-        version: 1.34.0
+        specifier: ^1.36.1
+        version: 1.36.1
       convex-test:
-        specifier: ^0.0.36
-        version: 0.0.36(convex@1.34.0)
+        specifier: ^0.0.50
+        version: 0.0.50(convex@1.36.1)
       eslint:
         specifier: ^9.0.0
         version: 9.39.4
@@ -1015,23 +1015,26 @@ packages:
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
-  convex-test@0.0.36:
-    resolution: {integrity: sha512-xcmjiYodRNypQLIVTSq/23BSH1sbJ8GKKKSX9A/JmZovrm1SEV0ATYriOlvRyoU6+3BNWt0AvP2Wql2HOSMHOg==}
+  convex-test@0.0.50:
+    resolution: {integrity: sha512-rMNfrgcKJGToYDqNns2n1AO9KUP1NyC/AF9ldYEuWwTfRbgC9RQiHjlZsZQ/sOjLIVPUyKKIjoI/fNJUzy1urw==}
     peerDependencies:
-      convex: ^1.16.4
+      convex: ^1.32.0
 
-  convex@1.34.0:
-    resolution: {integrity: sha512-TbC509Z4urZMChZR2aLPgalQ8gMhAYSz2VMxaYsCvba8YqB0Uxma7zWnXwRn7aEGXuA8ro5/uHgD1IJ0HhYYPg==}
+  convex@1.36.1:
+    resolution: {integrity: sha512-NVnwNqU+h8jyPuS0Itvj4MPH9c2yF+tA/RNoSDpCqiLhmYD4+kZxm0dDkVM0QDzz66wem9NqheBb9YQGsHwzBQ==}
     engines: {node: '>=18.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
       '@auth0/auth0-react': ^2.0.1
       '@clerk/clerk-react': ^4.12.8 || ^5.0.0
+      '@clerk/react': ^6.4.3
       react: ^18.0.0 || ^19.0.0-0 || ^19.0.0
     peerDependenciesMeta:
       '@auth0/auth0-react':
         optional: true
       '@clerk/clerk-react':
+        optional: true
+      '@clerk/react':
         optional: true
       react:
         optional: true
@@ -2407,19 +2410,19 @@ snapshots:
       - eslint-import-resolver-webpack
       - supports-color
 
-  '@convex-dev/eslint-plugin@1.2.1(convex@1.34.0)(eslint@9.39.4)(typescript@5.9.3)':
+  '@convex-dev/eslint-plugin@1.2.1(convex@1.36.1)(eslint@9.39.4)(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/types': 8.49.0
       '@typescript-eslint/utils': 8.49.0(eslint@9.39.4)(typescript@5.9.3)
-      convex: 1.34.0
+      convex: 1.36.1
     transitivePeerDependencies:
       - eslint
       - supports-color
       - typescript
 
-  '@convex-dev/sharded-counter@0.2.0(convex@1.34.0)':
+  '@convex-dev/sharded-counter@0.2.0(convex@1.36.1)':
     dependencies:
-      convex: 1.34.0
+      convex: 1.36.1
 
   '@edge-runtime/primitives@5.1.1': {}
 
@@ -2965,9 +2968,9 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 2.0.0
 
-  '@vllnt/eslint-config@1.0.0(@typescript-eslint/parser@8.57.1(eslint@9.39.4)(typescript@5.9.3))(convex@1.34.0)(eslint@9.39.4)(prettier@3.8.1)(turbo@2.8.20)(typescript@5.9.3)':
+  '@vllnt/eslint-config@1.0.0(@typescript-eslint/parser@8.57.1(eslint@9.39.4)(typescript@5.9.3))(convex@1.36.1)(eslint@9.39.4)(prettier@3.8.1)(turbo@2.8.20)(typescript@5.9.3)':
     dependencies:
-      '@convex-dev/eslint-plugin': 1.2.1(convex@1.34.0)(eslint@9.39.4)(typescript@5.9.3)
+      '@convex-dev/eslint-plugin': 1.2.1(convex@1.36.1)(eslint@9.39.4)(typescript@5.9.3)
       '@eslint/js': 9.39.4
       '@next/eslint-plugin-next': 16.2.1
       eslint: 9.39.4
@@ -3184,11 +3187,11 @@ snapshots:
 
   convert-source-map@2.0.0: {}
 
-  convex-test@0.0.36(convex@1.34.0):
+  convex-test@0.0.50(convex@1.36.1):
     dependencies:
-      convex: 1.34.0
+      convex: 1.36.1
 
-  convex@1.34.0:
+  convex@1.36.1:
     dependencies:
       esbuild: 0.27.0
       prettier: 3.8.1
