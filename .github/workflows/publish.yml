@@ -11,10 +11,12 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Version bump type"
+        description: "Release strategy"
         required: true
+        default: current
         type: choice
         options:
+          - current
           - patch
           - minor
           - major
@@ -83,7 +85,7 @@ jobs:
           SHORT_SHA=$(echo "$GITHUB_SHA" | cut -c1-7)
           CANARY_VERSION="${BASE_VERSION}-canary.${SHORT_SHA}"
           npm version "$CANARY_VERSION" --no-git-tag-version --ignore-scripts
-          npm publish --tag canary --provenance --access public --ignore-scripts
+          npx -y npm@11 publish --tag canary --provenance --access public --ignore-scripts
 
   release:
     name: Publish Release
@@ -111,11 +113,16 @@ jobs:
 
       - run: pnpm build
 
-      - name: Bump version
+      - name: Prepare version
         id: version
         run: |
-          npm version ${{ inputs.bump }} --no-git-tag-version --ignore-scripts
-          VERSION=$(node -p "require('./package.json').version")
+          if [ "${{ inputs.bump }}" = "current" ]; then
+            VERSION=$(node -p "require('./package.json').version")
+          else
+            npm version ${{ inputs.bump }} --no-git-tag-version --ignore-scripts
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
@@ -157,18 +164,30 @@ jobs:
 
       - name: Commit and tag
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json
-          git commit -m "chore(release): v${{ steps.version.outputs.version }}"
-          git tag -a "v${{ steps.version.outputs.version }}" -m "v${{ steps.version.outputs.version }}"
-          git push origin main --follow-tags
+
+          if git rev-parse "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"
+            exit 1
+          fi
+
+          if ! git diff --quiet -- package.json; then
+            git add package.json
+            git commit -m "chore(release): v$VERSION"
+            git push origin main
+          fi
+
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
 
       - name: Publish to npm
         run: |
           sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
           unset NODE_AUTH_TOKEN
-          npm publish --tag latest --provenance --access public --ignore-scripts
+          npx -y npm@11 publish --tag latest --provenance --access public --ignore-scripts
 
       - name: Create GitHub Release
         env:
