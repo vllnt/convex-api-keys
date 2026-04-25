@@ -21,13 +21,13 @@ body:
     id: package-version
     attributes:
       label: Package Version
-      placeholder: "0.1.0"
+      placeholder: "0.2.0"
     validations:
       required: true
   - type: input
     id: convex-version
     attributes:
       label: Convex Version
-      placeholder: "1.33.0"
+      placeholder: "1.36.1"
     validations:
       required: true

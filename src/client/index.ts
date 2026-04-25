@@ -4,6 +4,7 @@ import type {
   CreateKeyOptions,
   CreateKeyResult,
   ValidationResult,
+  ValidationFailureReason,
   KeyMetadata,
   UsageStats,
   RotateResult,
@@ -15,6 +16,7 @@ export type {
   CreateKeyOptions,
   CreateKeyResult,
   ValidationResult,
+  ValidationFailureReason,
   KeyMetadata,
   UsageStats,
   RotateResult,
@@ -98,7 +100,7 @@ export class ApiKeys {
 
   async list(
     ctx: RunQueryCtx,
-    args: { ownerId: string; env?: string; status?: KeyStatus },
+    args: { ownerId: string; env?: string; status?: KeyStatus; limit?: number },
   ): Promise<KeyMetadata[]> {
     return await ctx.runQuery(
       this.component.queries.list,
@@ -108,7 +110,7 @@ export class ApiKeys {
 
   async listByTag(
     ctx: RunQueryCtx,
-    args: { ownerId: string; tag: string },
+    args: { ownerId: string; tag: string; limit?: number },
   ): Promise<KeyMetadata[]> {
     return await ctx.runQuery(
       this.component.queries.listByTag,

@@ -12,38 +12,43 @@ Auto-generated. Do not edit manually.
 
 # @vllnt/convex-api-keys
 
-Secure API key management as a [Convex component](https://docs.convex.dev/components). Create, validate, revoke, rotate, rate-limit, and track usage — all backed by battle-tested `@convex-dev/*` ecosystem components.
+Secure API key management as a [Convex component](https://docs.convex.dev/components). Create, validate, revoke, rotate, and track usage — all with built-in auth boundaries and structured audit logging.
 
 ## Features
 
-- **Secure by default** — SHA-256 hashed storage, constant-time comparison, prefix-indexed O(1) lookup
+- **Secure by default** — SHA-256 hashed storage, constant-time comparison, prefix-indexed O(1) lookup, server-side secret generation
+- **Auth boundary** — `ownerId` required on all admin mutations — prevents cross-tenant access
 - **Key types** — `secret` and `publishable` keys with type-encoded prefixes
 - **Finite-use keys** — `remaining` counter with atomic decrement (verification tokens, one-time-use)
 - **Disable / Enable** — reversible pause without revoking
-- **Rotation** — configurable grace period where both old and new keys are valid
-- **Bulk revoke** — revoke all keys matching a tag in one call
+- **Rotation** — configurable grace period (60s–30d) where both old and new keys are valid
+- **Bulk revoke** — revoke all keys matching a tag (active, rotating, and disabled)
 - **Tags & environments** — filter keys by tags and environment strings
 - **Multi-tenant** — every query scoped by `ownerId`, no cross-tenant leakage
-- **Usage tracking** — audit event log + per-key usage analytics
-- **Extensible** — custom metadata, configurable prefix, event callbacks
+- **Usage tracking** — per-key usage counter via `@convex-dev/sharded-counter`
+- **Input validation** — keyPrefix/env charset, metadata size (4KB), scopes (50), tags (20)
+- **Structured logging** — audit trail via structured logs (Convex dashboard)
 
 ## Architecture
 
 ```
 Your App → @vllnt/convex-api-keys
-               ├── @convex-dev/rate-limiter   (per-key rate limiting)
-               ├── @convex-dev/sharded-counter (high-throughput counters)
-               ├── @convex-dev/aggregate       (O(log n) analytics)
-               └── @convex-dev/crons           (scheduled cleanup)
+               └── @convex-dev/sharded-counter (high-throughput usage counters)
 ```
 
-You install one package. Child components are internal — they don't appear in your `convex.config.ts`.
+You install one package. The child component is internal — it doesn't appear in your `convex.config.ts`.
+
+> **Rate limiting** is your responsibility. Add `@convex-dev/rate-limiter` at your HTTP action/mutation layer where you have real caller context (IP, auth, plan tier). The component has zero caller context and cannot make informed rate-limit decisions.
 
 ## Installation
 
+Peer dependency: `convex@^1.36.1`
+
 ```bash
-npm install @vllnt/convex-api-keys
+npm install convex@^1.36.1 @vllnt/convex-api-keys
 ```
+
+If your app already depends on Convex, make sure it satisfies `^1.36.1`.
 
 Register in your `convex/convex.config.ts`:
 
@@ -53,9 +58,6 @@ import apiKeys from "@vllnt/convex-api-keys/convex.config";
 
 const app = defineApp();
 app.use(apiKeys);
-
-// Optional: multiple isolated instances
-app.use(apiKeys, { name: "serviceKeys" });
 
 export default app;
 ```
@@ -80,15 +82,16 @@ const apiKeys = new ApiKeys(components.apiKeys, {
 const { key, keyId } = await apiKeys.create(ctx, {
   name: "Production SDK Key",
   ownerId: orgId,
-  type: "secret",                          // "secret" | "publishable"
+  type: "secret",
   scopes: ["read:users", "write:orders"],
   tags: ["sdk", "v2"],
-  env: "live",                             // any string
+  env: "live",
   metadata: { plan: "enterprise" },
   expiresAt: Date.now() + 90 * 24 * 60 * 60 * 1000,
-  remaining: 100000,                       // optional: finite-use
+  remaining: 100000,
 });
 // key = "myapp_secret_live_a1b2c3d4_<64-char-hex>"
+// Secret material is generated server-side — never passed from client
 ```
 
 ### Validate a key
@@ -98,20 +101,20 @@ const result = await apiKeys.validate(ctx, { key: bearerToken });
 
 if (!result.valid) {
   // result.reason: "malformed" | "not_found" | "revoked" | "expired"
-  //                | "exhausted" | "disabled" | "rate_limited"
+  //                | "exhausted" | "disabled"
   return new Response("Unauthorized", { status: 401 });
 }
 
-// result.valid === true
 const { keyId, ownerId, scopes, tags, env, type, metadata, remaining } = result;
 ```
 
 ### List keys
 
 ```ts
-const allKeys = await apiKeys.list(ctx, { ownerId: orgId });
+const keys = await apiKeys.list(ctx, { ownerId: orgId });
+const firstTwenty = await apiKeys.list(ctx, { ownerId: orgId, limit: 20 });
 const prodKeys = await apiKeys.list(ctx, { ownerId: orgId, env: "live" });
-const taggedKeys = await apiKeys.listByTag(ctx, { ownerId: orgId, tag: "sdk" });
+const taggedKeys = await apiKeys.listByTag(ctx, { ownerId: orgId, tag: "sdk", limit: 20 });
 ```
 
 ### Update metadata (without rotation)
@@ -119,6 +122,7 @@ const taggedKeys = await apiKeys.listByTag(ctx, { ownerId: orgId, tag: "sdk" });
 ```ts
 await apiKeys.update(ctx, {
   keyId,
+  ownerId: orgId,  // required — auth boundary
   name: "Renamed Key",
   scopes: ["read:users"],
   tags: ["sdk", "v3"],
@@ -129,19 +133,16 @@ await apiKeys.update(ctx, {
 ### Disable / Enable
 
 ```ts
-await apiKeys.disable(ctx, { keyId });
-// validate() → { valid: false, reason: "disabled" }
-
-await apiKeys.enable(ctx, { keyId });
-// validate() → { valid: true, ... }
+await apiKeys.disable(ctx, { keyId, ownerId: orgId });
+await apiKeys.enable(ctx, { keyId, ownerId: orgId });
 ```
 
 ### Revoke
 
 ```ts
-await apiKeys.revoke(ctx, { keyId });
+await apiKeys.revoke(ctx, { keyId, ownerId: orgId });
 
-// Bulk revoke by tag
+// Bulk revoke by tag (catches active, rotating, and disabled keys)
 await apiKeys.revokeByTag(ctx, { ownerId: orgId, tag: "compromised" });
 ```
 
@@ -150,31 +151,16 @@ await apiKeys.revokeByTag(ctx, { ownerId: orgId, tag: "compromised" });
 ```ts
 const { newKey, newKeyId, oldKeyExpiresAt } = await apiKeys.rotate(ctx, {
   keyId,
-  gracePeriodMs: 3600000, // 1 hour — both keys valid
+  ownerId: orgId,       // required — auth boundary
+  gracePeriodMs: 3600000, // 1 hour — both keys valid (min 60s, max 30d)
 });
 ```
 
 ### Usage analytics
 
 ```ts
-const usage = await apiKeys.getUsage(ctx, {
-  keyId,
-  period: { start: startOfMonth, end: Date.now() },
-});
-// { total: 42000, remaining: 58000, lastUsedAt: 1711036800000 }
-```
-
-### Finite-use keys (verification tokens)
-
-```ts
-const { key } = await apiKeys.create(ctx, {
-  name: "Email Verification",
-  ownerId: userId,
-  remaining: 1,
-  expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-});
-// First validate: { valid: true, remaining: 0 }
-// Second validate: { valid: false, reason: "exhausted" }
+const usage = await apiKeys.getUsage(ctx, { keyId, ownerId: orgId });
+// { total: 42000, remaining: 58000 }
 ```
 
 ## Key Format
@@ -203,16 +189,22 @@ create() → ACTIVE ──→ DISABLED (reversible via enable())
 |--------|-----|-------------|
 | `create(ctx, options)` | mutation | Create a new API key |
 | `validate(ctx, { key })` | mutation | Validate and track usage |
-| `revoke(ctx, { keyId })` | mutation | Permanently revoke a key |
+| `revoke(ctx, { keyId, ownerId })` | mutation | Permanently revoke a key |
 | `revokeByTag(ctx, { ownerId, tag })` | mutation | Bulk revoke by tag |
-| `rotate(ctx, { keyId, gracePeriodMs? })` | mutation | Rotate with grace period |
-| `list(ctx, { ownerId, env?, status? })` | query | List keys (no secrets exposed) |
-| `listByTag(ctx, { ownerId, tag })` | query | Filter by tag |
-| `update(ctx, { keyId, name?, scopes?, tags?, metadata? })` | mutation | Update metadata in-place |
-| `disable(ctx, { keyId })` | mutation | Temporarily disable |
-| `enable(ctx, { keyId })` | mutation | Re-enable disabled key |
-| `getUsage(ctx, { keyId, period? })` | query | Usage analytics |
-| `configure(ctx, { ... })` | mutation | Runtime config |
+| `rotate(ctx, { keyId, ownerId, gracePeriodMs? })` | mutation | Rotate with grace period |
+| `list(ctx, { ownerId, env?, status?, limit? })` | query | List keys (paginated, default 100) |
+| `listByTag(ctx, { ownerId, tag, limit? })` | query | Filter by tag |
+| `update(ctx, { keyId, ownerId, name?, ... })` | mutation | Update metadata in-place |
+| `disable(ctx, { keyId, ownerId })` | mutation | Temporarily disable |
+| `enable(ctx, { keyId, ownerId })` | mutation | Re-enable disabled key |
+| `getUsage(ctx, { keyId, ownerId })` | query | Usage counter (O(1)) |
+| `configure(ctx, { ... })` | mutation | Runtime config (admin-only) |
+
+## Security Model
+
+This component protects against **accidental cross-tenant bugs in honest host apps**. The `ownerId` check prevents a bug from operating on another tenant's keys — it does NOT prevent a compromised host app from passing a forged `ownerId`.
+
+Integrators must derive `ownerId` from their own auth layer (e.g., `ctx.auth.getUserIdentity()`) before passing it to the component.
 
 ## Testing
 
@@ -221,9 +213,11 @@ For testing with `convex-test`:
 ```ts
 import { convexTest } from "convex-test";
 import { register } from "@vllnt/convex-api-keys/test";
+import shardedCounterTest from "@convex-dev/sharded-counter/test";
 
 const t = convexTest(schema, modules);
 register(t, "apiKeys");
+shardedCounterTest.register(t, "apiKeys/shardedCounter");
 ```
 
 ## Contributing
@@ -233,6 +227,218 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR 
 ## License
 
 Apache-2.0
+
+
+---
+
+## CHANGELOG.md
+
+# Changelog
+
+## 0.2.0
+
+### Breaking Changes
+
+- **Convex compatibility**: this release targets `convex@^1.36.1` and `convex-test@^0.0.50`.
+- **`create()` / `rotate()`**: Secret material (lookupPrefix, secretHex, hash) now generated server-side. Remove these from client args.
+- **Admin mutations** (`revoke`, `disable`, `enable`, `update`, `rotate`, `getUsage`): `ownerId` is now a required argument for auth boundary enforcement.
+- **`apiKeyEvents` table removed**: Audit trail replaced with structured logging (Convex dashboard). Export existing event data before upgrading.
+- **`@convex-dev/rate-limiter` removed**: Rate limiting is now the integrator's responsibility at their HTTP action/mutation layer. Remove `rateLimiterTest.register()` from test setup.
+- **`@convex-dev/aggregate` and `@convex-dev/crons` removed**: Remove `aggregateTest.register()` and `cronsTest.register()` from test setup.
+- **`getUsage()`**: `period` param removed (counter-only). `lastUsedAt` removed from return type.
+- **`validate()`**: `retryAfter` removed from failure response (no internal rate limiting).
+- **`list()` / `listByTag()`**: Now paginated with `limit` param (default 100).
+
+### Migration Guide
+
+```ts
+// BEFORE (v0.1)
+const { key } = await apiKeys.create(ctx, {
+  name: "My Key", ownerId: "org_1",
+  lookupPrefix, secretHex, hash,  // ← REMOVE these
+});
+await apiKeys.revoke(ctx, { keyId });
+await apiKeys.rotate(ctx, { keyId, lookupPrefix, secretHex });
+const usage = await apiKeys.getUsage(ctx, { keyId, period: { start, end } });
+
+// AFTER (v0.2)
+const { key } = await apiKeys.create(ctx, {
+  name: "My Key", ownerId: "org_1",
+  // secret material generated server-side
+});
+await apiKeys.revoke(ctx, { keyId, ownerId: "org_1" });    // ← ADD ownerId
+await apiKeys.rotate(ctx, { keyId, ownerId: "org_1" });    // ← ADD ownerId
+const usage = await apiKeys.getUsage(ctx, { keyId, ownerId: "org_1" }); // ← ADD ownerId, REMOVE period
+```
+
+Test setup:
+
+```ts
+// BEFORE
+import rateLimiterTest from "@convex-dev/rate-limiter/test";
+import aggregateTest from "@convex-dev/aggregate/test";
+import cronsTest from "@convex-dev/crons/test";
+rateLimiterTest.register(t, "apiKeys/rateLimiter");
+aggregateTest.register(t, "apiKeys/usageAggregate");
+cronsTest.register(t, "apiKeys/crons");
+
+// AFTER — only shardedCounter remains
+import shardedCounterTest from "@convex-dev/sharded-counter/test";
+shardedCounterTest.register(t, "apiKeys/shardedCounter");
+```
+
+### New Features
+
+- Public client wrapper now forwards optional `limit` to `list()` and `listByTag()`
+- `ValidationFailure` no longer advertises the removed `retryAfter` field
+- Auth boundary: `ownerId` cross-check on all admin mutations
+- Server-side secret generation for `create()` and `rotate()`
+- Input validation: keyPrefix charset, env charset, gracePeriodMs bounds (60s–30d), metadata size (4KB), scopes (50), tags (20)
+- Configure bounds validation (reject negative/zero)
+- Structured audit logging on all mutation outcomes
+- lastUsedAt throttled to 60s (reduces OCC contention)
+- Remaining decrement decoupled from lastUsedAt write (single merged patch)
+- revokeByTag expanded to include `rotating` and `disabled` statuses
+- Paginated list/listByTag with configurable limit
+
+## 0.1.1
+
+- CI fix: add --ignore-scripts to npm publish
+
+## 0.1.0
+
+- Initial release
+- Key creation with SHA-256 hashing, prefix-indexed lookup
+- Key validation with status/expiry/remaining checks
+- Key revocation (single + bulk by tag)
+- Key rotation with configurable grace period
+- Key listing by owner, tag, environment
+- Key update (name, scopes, tags, metadata) without rotation
+- Key disable/enable (reversible pause)
+- Finite-use keys (remaining counter with atomic decrement)
+- Key types (secret / publishable) with type-encoded prefix
+- Environment-aware key format
+- Multi-tenant isolation (ownerId-scoped queries)
+- Audit event log (apiKeyEvents table)
+- Usage analytics via event counting
+- Child components: @convex-dev/rate-limiter, sharded-counter, aggregate, crons
+
+
+---
+
+## docs/API.md
+
+# API Reference
+
+Full API reference for `@vllnt/convex-api-keys`.
+
+**Compatibility:** `convex@^1.36.1`
+
+## ApiKeys Class
+
+```ts
+import { ApiKeys } from "@vllnt/convex-api-keys";
+import { components } from "./_generated/api";
+
+const apiKeys = new ApiKeys(components.apiKeys, {
+  prefix: "myapp",      // key prefix (default: "vk")
+  defaultType: "secret", // "secret" | "publishable" (default: "secret")
+});
+```
+
+## Methods
+
+### create(ctx, options)
+
+Create a new API key. Secret material is generated server-side. Returns the raw key once — only the hash is stored.
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | yes | Display name (max 256 chars) |
+| `ownerId` | `string` | yes | Tenant/org/user ID |
+| `type` | `"secret" \| "publishable"` | no | Key type (default from config) |
+| `scopes` | `string[]` | no | Permission scopes (max 50) |
+| `tags` | `string[]` | no | Filterable tags (max 20) |
+| `env` | `string` | no | Environment (default: `"live"`, must match `^[a-zA-Z0-9-]+$`) |
+| `metadata` | `Record<string, unknown>` | no | Arbitrary JSON (max 4KB) |
+| `remaining` | `number` | no | Finite-use counter |
+| `expiresAt` | `number` | no | Expiry timestamp (ms) |
+
+**Returns:** `{ keyId: string, key: string }`
+
+### validate(ctx, { key })
+
+Validate a key and track usage. Decrements `remaining` if set.
+
+**Returns:** `{ valid: true, keyId, ownerId, type, env, scopes, tags, metadata, remaining }` or `{ valid: false, reason }`
+
+**Rejection reasons:** `"malformed"`, `"not_found"`, `"revoked"`, `"disabled"`, `"expired"`, `"exhausted"`
+
+### revoke(ctx, { keyId, ownerId })
+
+Permanently revoke a key. Idempotent. Requires `ownerId` for auth boundary.
+
+### revokeByTag(ctx, { ownerId, tag })
+
+Bulk revoke all keys matching a tag. Covers `active`, `rotating`, and `disabled` statuses.
+
+**Returns:** `{ revokedCount: number }`
+
+### rotate(ctx, { keyId, ownerId, gracePeriodMs? })
+
+Create a new key and put the old key in grace period. Both keys validate during the grace period. Secret material generated server-side.
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `gracePeriodMs` | `number` | `3600000` (1h) | Grace period (min 60s, max 30 days) |
+
+**Returns:** `{ newKeyId, newKey, oldKeyExpiresAt }`
+
+### list(ctx, { ownerId, env?, status?, limit? })
+
+List keys for an owner. No secrets exposed. Paginated (default 100).
+
+### listByTag(ctx, { ownerId, tag, limit? })
+
+List keys matching a specific tag. Paginated (default 100).
+
+### update(ctx, { keyId, ownerId, name?, scopes?, tags?, metadata? })
+
+Update key metadata in-place without rotation. Requires `ownerId` for auth boundary.
+
+### disable(ctx, { keyId, ownerId })
+
+Temporarily disable a key. Reversible via `enable()`. Requires `ownerId`.
+
+### enable(ctx, { keyId, ownerId })
+
+Re-enable a disabled key. Requires `ownerId`.
+
+### getUsage(ctx, { keyId, ownerId })
+
+Get usage count for a key. Returns O(1) counter value.
+
+**Returns:** `{ total: number, remaining?: number }`
+
+### configure(ctx, { cleanupIntervalMs?, defaultExpiryMs? })
+
+Set runtime configuration. Admin-only surface — no ownerId scoping. Values must be > 0.
+
+## Input Validation
+
+| Field | Constraint |
+|-------|-----------|
+| `keyPrefix` | `^[a-zA-Z0-9]+$` (no underscores) |
+| `env` | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing) |
+| `name` | max 256 characters |
+| `metadata` | max 4KB (JSON serialized) |
+| `scopes` | max 50 entries |
+| `tags` | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$` |
+| `gracePeriodMs` | min 60,000 (60s), max 2,592,000,000 (30 days) |
+| `remaining` | must be > 0 |
+| `expiresAt` | must be in the future |
+| `cleanupIntervalMs` | must be > 0 |
+| `defaultExpiryMs` | must be > 0 |
 
 
 ---
@@ -268,32 +474,59 @@ export const TERMINAL_STATUSES: ReadonlySet<KeyStatus> = new Set([
 ]);
 
 export const TAG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]*$/;
+export const KEY_PREFIX_PATTERN = /^[a-zA-Z0-9]+$/;
+export const ENV_PATTERN = /^[a-zA-Z0-9-]+$/;
 
-export const EVENT_TYPE = v.union(
-  v.literal("key.created"),
-  v.literal("key.validated"),
-  v.literal("key.validate_failed"),
-  v.literal("key.revoked"),
-  v.literal("key.rotated"),
-  v.literal("key.expired"),
-  v.literal("key.exhausted"),
-  v.literal("key.disabled"),
-  v.literal("key.enabled"),
-  v.literal("key.updated"),
-  v.literal("key.rate_limited"),
-);
-export type EventType =
-  | "key.created"
-  | "key.validated"
-  | "key.validate_failed"
-  | "key.revoked"
-  | "key.rotated"
-  | "key.expired"
-  | "key.exhausted"
-  | "key.disabled"
-  | "key.enabled"
-  | "key.updated"
-  | "key.rate_limited";
+export const MAX_METADATA_SIZE = 4096;
+export const MAX_SCOPES = 50;
+export const MAX_TAGS = 20;
+export const MAX_STRING_LENGTH = 256;
+
+export function validateKeyPrefix(prefix: string): void {
+  if (!KEY_PREFIX_PATTERN.test(prefix)) {
+    throw new Error(
+      `Invalid keyPrefix "${prefix}": must match ^[a-zA-Z0-9]+$ (alphanumeric only, no underscores)`,
+    );
+  }
+  if (prefix.length > MAX_STRING_LENGTH) {
+    throw new Error(`keyPrefix must be <= ${MAX_STRING_LENGTH} characters`);
+  }
+}
+
+export function validateEnv(env: string): void {
+  if (!ENV_PATTERN.test(env)) {
+    throw new Error(
+      `Invalid env "${env}": must match ^[a-zA-Z0-9-]+$ (no underscores — would break key parsing)`,
+    );
+  }
+  if (env.length > MAX_STRING_LENGTH) {
+    throw new Error(`env must be <= ${MAX_STRING_LENGTH} characters`);
+  }
+}
+
+export function validateSizeLimits(args: {
+  metadata?: unknown;
+  scopes?: string[];
+  tags?: string[];
+  name?: string;
+}): void {
+  if (args.metadata !== undefined) {
+    const size = JSON.stringify(args.metadata).length;
+    if (size > MAX_METADATA_SIZE) {
+      throw new Error(`metadata must be <= ${MAX_METADATA_SIZE} bytes (got ${size})`);
+    }
+  }
+  if (args.scopes && args.scopes.length > MAX_SCOPES) {
+    throw new Error(`scopes must have <= ${MAX_SCOPES} entries (got ${args.scopes.length})`);
+  }
+  if (args.tags && args.tags.length > MAX_TAGS) {
+    throw new Error(`tags must have <= ${MAX_TAGS} entries (got ${args.tags.length})`);
+  }
+  if (args.name && args.name.length > MAX_STRING_LENGTH) {
+    throw new Error(`name must be <= ${MAX_STRING_LENGTH} characters`);
+  }
+}
+
 
 export function validateTag(tag: string): void {
   if (!TAG_PATTERN.test(tag)) {
@@ -353,6 +586,7 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return result === 0;
 }
 
+/** Compute SHA-256 hash of input, returned as lowercase hex string. */
 export async function sha256Hex(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
@@ -362,15 +596,14 @@ export async function sha256Hex(input: string): Promise<string> {
 }
 ```
 
-
 ---
 
 ## src/client/types.ts
 
 ```ts
-import type { KeyType, KeyStatus, EventType } from "../shared.js";
+import type { KeyType, KeyStatus } from "../shared.js";
 
-export type { KeyType, KeyStatus, EventType };
+export type { KeyType, KeyStatus };
 
 export interface CreateKeyOptions {
   name: string;
@@ -401,10 +634,17 @@ export interface ValidationSuccess {
   remaining?: number;
 }
 
+export type ValidationFailureReason =
+  | "malformed"
+  | "not_found"
+  | "revoked"
+  | "disabled"
+  | "expired"
+  | "exhausted";
+
 export interface ValidationFailure {
   valid: false;
-  reason: string;
-  retryAfter?: number;
+  reason: ValidationFailureReason;
 }
 
 export type ValidationResult = ValidationSuccess | ValidationFailure;
@@ -428,7 +668,6 @@ export interface KeyMetadata {
 export interface UsageStats {
   total: number;
   remaining?: number;
-  lastUsedAt?: number;
 }
 
 export interface RotateResult {
@@ -436,17 +675,7 @@ export interface RotateResult {
   newKey: string;
   oldKeyExpiresAt: number;
 }
-
-export interface KeyEvent {
-  keyId: string;
-  ownerId: string;
-  eventType: EventType;
-  reason?: string;
-  metadata?: Record<string, unknown>;
-  timestamp: number;
-}
 ```
-
 
 ---
 
@@ -455,11 +684,11 @@ export interface KeyEvent {
 ```ts
 import type { GenericMutationCtx, GenericQueryCtx, GenericDataModel } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
-import { sha256Hex } from "../shared.js";
 import type {
   CreateKeyOptions,
   CreateKeyResult,
   ValidationResult,
+  ValidationFailureReason,
   KeyMetadata,
   UsageStats,
   RotateResult,
@@ -471,6 +700,7 @@ export type {
   CreateKeyOptions,
   CreateKeyResult,
   ValidationResult,
+  ValidationFailureReason,
   KeyMetadata,
   UsageStats,
   RotateResult,
@@ -484,14 +714,6 @@ export type RunQueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
 export interface ApiKeysConfig {
   prefix?: string;
   defaultType?: KeyType;
-}
-
-function generateRandomHex(length: number): string {
-  const bytes = new Uint8Array(length / 2);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 export class ApiKeys {
@@ -509,30 +731,17 @@ export class ApiKeys {
     ctx: RunMutationCtx,
     options: CreateKeyOptions,
   ): Promise<CreateKeyResult> {
-    const type = options.type ?? this.defaultType;
-    const typeShort = type === "publishable" ? "pub" : "secret";
-    const env = options.env ?? "live";
-
-    const lookupPrefix = generateRandomHex(8);
-    const secretHex = generateRandomHex(64);
-
-    const rawKey = [this.prefix, typeShort, env, lookupPrefix, secretHex].join("_");
-    const hash = await sha256Hex(rawKey);
-
     const result = await ctx.runMutation(this.component.mutations.create, {
       name: options.name,
       ownerId: options.ownerId,
-      type,
+      type: options.type ?? this.defaultType,
       scopes: options.scopes,
       tags: options.tags,
-      env,
+      env: options.env ?? "live",
       metadata: options.metadata,
       remaining: options.remaining,
       expiresAt: options.expiresAt,
       keyPrefix: this.prefix,
-      lookupPrefix,
-      secretHex,
-      hash,
     });
 
     return { keyId: result.keyId as string, key: result.key };
@@ -548,8 +757,11 @@ export class ApiKeys {
     ) as ValidationResult;
   }
 
-  async revoke(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.mutations.revoke, { keyId: args.keyId });
+  async revoke(ctx: RunMutationCtx, args: { keyId: string; ownerId: string }): Promise<void> {
+    await ctx.runMutation(this.component.mutations.revoke, {
+      keyId: args.keyId,
+      ownerId: args.ownerId,
+    });
   }
 
   async revokeByTag(
@@ -561,22 +773,18 @@ export class ApiKeys {
 
   async rotate(
     ctx: RunMutationCtx,
-    args: { keyId: string; gracePeriodMs?: number },
+    args: { keyId: string; ownerId: string; gracePeriodMs?: number },
   ): Promise<RotateResult> {
-    const lookupPrefix = generateRandomHex(8);
-    const secretHex = generateRandomHex(64);
-
     return await ctx.runMutation(this.component.mutations.rotate, {
       keyId: args.keyId,
+      ownerId: args.ownerId,
       gracePeriodMs: args.gracePeriodMs,
-      lookupPrefix,
-      secretHex,
     }) as RotateResult;
   }
 
   async list(
     ctx: RunQueryCtx,
-    args: { ownerId: string; env?: string; status?: KeyStatus },
+    args: { ownerId: string; env?: string; status?: KeyStatus; limit?: number },
   ): Promise<KeyMetadata[]> {
     return await ctx.runQuery(
       this.component.queries.list,
@@ -586,7 +794,7 @@ export class ApiKeys {
 
   async listByTag(
     ctx: RunQueryCtx,
-    args: { ownerId: string; tag: string },
+    args: { ownerId: string; tag: string; limit?: number },
   ): Promise<KeyMetadata[]> {
     return await ctx.runQuery(
       this.component.queries.listByTag,
@@ -598,6 +806,7 @@ export class ApiKeys {
     ctx: RunMutationCtx,
     args: {
       keyId: string;
+      ownerId: string;
       name?: string;
       scopes?: string[];
       tags?: string[];
@@ -606,6 +815,7 @@ export class ApiKeys {
   ): Promise<void> {
     await ctx.runMutation(this.component.mutations.update, {
       keyId: args.keyId,
+      ownerId: args.ownerId,
       name: args.name,
       scopes: args.scopes,
       tags: args.tags,
@@ -613,21 +823,27 @@ export class ApiKeys {
     });
   }
 
-  async disable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.mutations.disable, { keyId: args.keyId });
+  async disable(ctx: RunMutationCtx, args: { keyId: string; ownerId: string }): Promise<void> {
+    await ctx.runMutation(this.component.mutations.disable, {
+      keyId: args.keyId,
+      ownerId: args.ownerId,
+    });
   }
 
-  async enable(ctx: RunMutationCtx, args: { keyId: string }): Promise<void> {
-    await ctx.runMutation(this.component.mutations.enable, { keyId: args.keyId });
+  async enable(ctx: RunMutationCtx, args: { keyId: string; ownerId: string }): Promise<void> {
+    await ctx.runMutation(this.component.mutations.enable, {
+      keyId: args.keyId,
+      ownerId: args.ownerId,
+    });
   }
 
   async getUsage(
     ctx: RunQueryCtx,
-    args: { keyId: string; period?: { start: number; end: number } },
+    args: { keyId: string; ownerId: string },
   ): Promise<UsageStats> {
     return await ctx.runQuery(this.component.queries.getUsage, {
       keyId: args.keyId,
-      period: args.period,
+      ownerId: args.ownerId,
     }) as UsageStats;
   }
 
@@ -639,7 +855,6 @@ export class ApiKeys {
   }
 }
 ```
-
 
 ---
 
@@ -675,24 +890,12 @@ export default defineSchema({
     .index("by_owner_status", ["ownerId", "status"])
     .index("by_owner_env", ["ownerId", "env", "status"]),
 
-  apiKeyEvents: defineTable({
-    keyId: v.id("apiKeys"),
-    ownerId: v.string(),
-    eventType: v.string(),
-    reason: v.optional(v.string()),
-    metadata: v.optional(jsonValue),
-    timestamp: v.number(),
-  })
-    .index("by_key", ["keyId", "timestamp"])
-    .index("by_owner", ["ownerId", "timestamp"]),
-
   config: defineTable({
     cleanupIntervalMs: v.optional(v.number()),
     defaultExpiryMs: v.optional(v.number()),
   }),
 });
 ```
-
 
 ---
 
@@ -705,7 +908,6 @@ import { v } from "convex/values";
 export const jsonValue = v.any();
 ```
 
-
 ---
 
 ## src/component/mutations.ts
@@ -714,16 +916,17 @@ export const jsonValue = v.any();
 import { v } from "convex/values";
 import { mutation } from "./_generated/server.js";
 import { components } from "./_generated/api.js";
-import { RateLimiter, MINUTE, HOUR } from "@convex-dev/rate-limiter";
 import { ShardedCounter } from "@convex-dev/sharded-counter";
 import {
-  KEY_STATUS,
   KEY_TYPE,
   TERMINAL_STATUSES,
   parseKeyString,
   timingSafeEqual,
   sha256Hex,
   validateTags,
+  validateKeyPrefix,
+  validateEnv,
+  validateSizeLimits,
   KEY_PREFIX_SEPARATOR,
 } from "../shared.js";
 import { createLogger } from "../log.js";
@@ -732,12 +935,15 @@ import type { KeyStatus } from "../shared.js";
 
 const log = createLogger("api-keys");
 
-const rateLimiter = new RateLimiter(components.rateLimiter, {
-  createKey: { kind: "fixed window", rate: 100, period: HOUR },
-  validateKey: { kind: "token bucket", rate: 1000, period: MINUTE },
-});
-
 const counter = new ShardedCounter(components.shardedCounter);
+
+function generateRandomHex(length: number): string {
+  const bytes = new Uint8Array(length / 2);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 export const create = mutation({
   args: {
@@ -751,9 +957,6 @@ export const create = mutation({
     remaining: v.optional(v.number()),
     expiresAt: v.optional(v.number()),
     keyPrefix: v.optional(v.string()),
-    lookupPrefix: v.string(),
-    secretHex: v.string(),
-    hash: v.string(),
   },
   returns: v.object({
     keyId: v.id("apiKeys"),
@@ -770,19 +973,25 @@ export const create = mutation({
       validateTags(args.tags);
     }
 
-    await rateLimiter.limit(ctx, "createKey", {
-      key: args.ownerId,
-      throws: true,
-    });
+    const prefix = args.keyPrefix ?? "vk";
+    validateKeyPrefix(prefix);
+    const env = args.env ?? "live";
+    validateEnv(env);
+    validateSizeLimits({ metadata: args.metadata, scopes: args.scopes, tags: args.tags, name: args.name });
 
     const type = args.type ?? "secret";
-    const env = args.env ?? "live";
-    const prefix = args.keyPrefix ?? "vk";
     const typeShort = type === "publishable" ? "pub" : "secret";
 
+    const lookupPrefix = generateRandomHex(8);
+    const secretHex = generateRandomHex(64);
+    const rawKey = [prefix, typeShort, env, lookupPrefix, secretHex].join(
+      KEY_PREFIX_SEPARATOR,
+    );
+    const hash = await sha256Hex(rawKey);
+
     const keyId = await ctx.db.insert("apiKeys", {
-      hash: args.hash,
-      lookupPrefix: args.lookupPrefix,
+      hash,
+      lookupPrefix,
       keyPrefix: prefix,
       type,
       env,
@@ -796,21 +1005,12 @@ export const create = mutation({
       expiresAt: args.expiresAt,
     });
 
-    await ctx.db.insert("apiKeyEvents", {
-      keyId,
-      ownerId: args.ownerId,
-      eventType: "key.created",
-      timestamp: Date.now(),
-    });
-
-    const rawKey = [prefix, typeShort, env, args.lookupPrefix, args.secretHex].join(
-      KEY_PREFIX_SEPARATOR,
-    );
-
-    log.info("key created", { keyId, ownerId: args.ownerId, type, env });
+    log.info("key.created", { keyId, ownerId: args.ownerId, type, env });
     return { keyId, key: rawKey };
   },
 });
+
+const LAST_USED_AT_THROTTLE_MS = 60_000;
 
 export const validate = mutation({
   args: {
@@ -831,12 +1031,12 @@ export const validate = mutation({
     v.object({
       valid: v.literal(false),
       reason: v.string(),
-      retryAfter: v.optional(v.number()),
     }),
   ),
   handler: async (ctx, { key }) => {
     const parsed = parseKeyString(key);
     if (!parsed.valid) {
+      log.info("key.validate_failed", { reason: "malformed" });
       return { valid: false as const, reason: "malformed" };
     }
 
@@ -846,6 +1046,7 @@ export const validate = mutation({
       .collect();
 
     if (candidates.length === 0) {
+      log.info("key.validate_failed", { reason: "not_found", lookupPrefix: parsed.lookupPrefix });
       return { valid: false as const, reason: "not_found" };
     }
 
@@ -860,45 +1061,30 @@ export const validate = mutation({
     }
 
     if (!matchedKey) {
+      log.info("key.validate_failed", { reason: "not_found", lookupPrefix: parsed.lookupPrefix });
       return { valid: false as const, reason: "not_found" };
     }
 
     const now = Date.now();
 
     if (matchedKey.status === "revoked") {
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.validate_failed",
-        reason: "revoked",
-        timestamp: now,
-      });
+      log.info("key.validate_failed", { keyId: matchedKey._id, reason: "revoked" });
       return { valid: false as const, reason: "revoked" };
     }
 
     if (matchedKey.status === "disabled") {
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.validate_failed",
-        reason: "disabled",
-        timestamp: now,
-      });
+      log.info("key.validate_failed", { keyId: matchedKey._id, reason: "disabled" });
       return { valid: false as const, reason: "disabled" };
     }
 
     if (matchedKey.status === "exhausted") {
+      log.info("key.validate_failed", { keyId: matchedKey._id, reason: "exhausted" });
       return { valid: false as const, reason: "exhausted" };
     }
 
     if (matchedKey.expiresAt && matchedKey.expiresAt <= now) {
       await ctx.db.patch(matchedKey._id, { status: "expired" });
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.expired",
-        timestamp: now,
-      });
+      log.info("key.expired", { keyId: matchedKey._id });
       return { valid: false as const, reason: "expired" };
     }
 
@@ -908,13 +1094,7 @@ export const validate = mutation({
       matchedKey.gracePeriodEnd <= now
     ) {
       await ctx.db.patch(matchedKey._id, { status: "expired" });
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.expired",
-        reason: "grace_period_ended",
-        timestamp: now,
-      });
+      log.info("key.expired", { keyId: matchedKey._id, reason: "grace_period_ended" });
       return { valid: false as const, reason: "expired" };
     }
 
@@ -922,58 +1102,35 @@ export const validate = mutation({
     if (matchedKey.remaining !== undefined) {
       if (matchedKey.remaining <= 0) {
         await ctx.db.patch(matchedKey._id, { status: "exhausted" });
-        await ctx.db.insert("apiKeyEvents", {
-          keyId: matchedKey._id,
-          ownerId: matchedKey.ownerId,
-          eventType: "key.exhausted",
-          timestamp: now,
-        });
+        log.info("key.exhausted", { keyId: matchedKey._id });
         return { valid: false as const, reason: "exhausted" };
       }
       newRemaining = matchedKey.remaining - 1;
-      const updates: Record<string, unknown> = {
-        remaining: newRemaining,
-        lastUsedAt: now,
-      };
-      if (newRemaining === 0) {
-        updates.status = "exhausted";
-      }
-      await ctx.db.patch(matchedKey._id, updates);
-
-      if (newRemaining === 0) {
-        await ctx.db.insert("apiKeyEvents", {
-          keyId: matchedKey._id,
-          ownerId: matchedKey.ownerId,
-          eventType: "key.exhausted",
-          timestamp: now,
-        });
-      }
-    } else {
-      await ctx.db.patch(matchedKey._id, { lastUsedAt: now });
     }
 
-    const { ok, retryAfter } = await rateLimiter.limit(ctx, "validateKey", {
-      key: matchedKey._id,
-      throws: false,
-    });
-    if (!ok) {
-      await ctx.db.insert("apiKeyEvents", {
-        keyId: matchedKey._id,
-        ownerId: matchedKey.ownerId,
-        eventType: "key.rate_limited",
-        timestamp: now,
-      });
-      return { valid: false as const, reason: "rate_limited", retryAfter };
+    const shouldUpdateLastUsed =
+      !matchedKey.lastUsedAt || now - matchedKey.lastUsedAt >= LAST_USED_AT_THROTTLE_MS;
+
+    const patch: Record<string, unknown> = {};
+    if (newRemaining !== matchedKey.remaining) {
+      patch.remaining = newRemaining;
+      if (newRemaining === 0) {
+        patch.status = "exhausted";
+      }
+    }
+    if (shouldUpdateLastUsed) {
+      patch.lastUsedAt = now;
+    }
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(matchedKey._id, patch);
+    }
+    if (newRemaining === 0) {
+      log.info("key.exhausted", { keyId: matchedKey._id });
     }
 
     await counter.add(ctx, matchedKey._id, 1);
 
-    await ctx.db.insert("apiKeyEvents", {
-      keyId: matchedKey._id,
-      ownerId: matchedKey.ownerId,
-      eventType: "key.validated",
-      timestamp: now,
-    });
+    log.info("key.validated", { keyId: matchedKey._id, ownerId: matchedKey.ownerId });
 
     return {
       valid: true as const,
@@ -992,24 +1149,22 @@ export const validate = mutation({
 export const revoke = mutation({
   args: {
     keyId: v.id("apiKeys"),
+    ownerId: v.string(),
   },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
+  handler: async (ctx, { keyId, ownerId }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
+    }
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
     if (key.status === "revoked") {
       return null;
     }
     await ctx.db.patch(keyId, { status: "revoked", revokedAt: Date.now() });
-    await ctx.db.insert("apiKeyEvents", {
-      keyId,
-      ownerId: key.ownerId,
-      eventType: "key.revoked",
-      timestamp: Date.now(),
-    });
-    log.info("key revoked", { keyId, ownerId: key.ownerId });
+    log.info("key.revoked", { keyId, ownerId });
     return null;
   },
 });
@@ -1021,36 +1176,41 @@ export const revokeByTag = mutation({
   },
   returns: v.object({ revokedCount: v.number() }),
   handler: async (ctx, { ownerId, tag }) => {
-    const keys = await ctx.db
+    const activeKeys = await ctx.db
       .query("apiKeys")
       .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId).eq("status", "active"))
       .collect();
+    const rotatingKeys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId).eq("status", "rotating"))
+      .collect();
+    const disabledKeys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId).eq("status", "disabled"))
+      .collect();
 
+    const allKeys = [...activeKeys, ...rotatingKeys, ...disabledKeys];
     let revokedCount = 0;
     const now = Date.now();
-    for (const key of keys) {
+    for (const key of allKeys) {
       if (key.tags.includes(tag)) {
         await ctx.db.patch(key._id, { status: "revoked", revokedAt: now });
-        await ctx.db.insert("apiKeyEvents", {
-          keyId: key._id,
-          ownerId,
-          eventType: "key.revoked",
-          reason: `bulk_revoke_by_tag:${tag}`,
-          timestamp: now,
-        });
         revokedCount++;
       }
     }
+    log.info("key.bulk_revoked", { ownerId, tag, revokedCount });
     return { revokedCount };
   },
 });
 
+const MIN_GRACE_PERIOD_MS = 60_000;
+const MAX_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
 export const rotate = mutation({
   args: {
     keyId: v.id("apiKeys"),
+    ownerId: v.string(),
     gracePeriodMs: v.optional(v.number()),
-    lookupPrefix: v.string(),
-    secretHex: v.string(),
   },
   returns: v.object({
     newKeyId: v.id("apiKeys"),
@@ -1062,12 +1222,21 @@ export const rotate = mutation({
     if (!oldKey) {
       throw new Error("key not found");
     }
+    if (oldKey.ownerId !== args.ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
+    }
     if (TERMINAL_STATUSES.has(oldKey.status as KeyStatus)) {
       throw new Error("cannot rotate a terminal key");
     }
 
-    const now = Date.now();
     const gracePeriodMs = args.gracePeriodMs ?? 3600000;
+    if (gracePeriodMs < MIN_GRACE_PERIOD_MS || gracePeriodMs > MAX_GRACE_PERIOD_MS) {
+      throw new Error(
+        `gracePeriodMs must be between ${MIN_GRACE_PERIOD_MS} (60s) and ${MAX_GRACE_PERIOD_MS} (30 days)`,
+      );
+    }
+
+    const now = Date.now();
     const gracePeriodEnd = now + gracePeriodMs;
 
     await ctx.db.patch(args.keyId, {
@@ -1076,18 +1245,20 @@ export const rotate = mutation({
     });
 
     const typeShort = oldKey.type === "publishable" ? "pub" : "secret";
+    const lookupPrefix = generateRandomHex(8);
+    const secretHex = generateRandomHex(64);
     const rawKey = [
       oldKey.keyPrefix,
       typeShort,
       oldKey.env,
-      args.lookupPrefix,
-      args.secretHex,
+      lookupPrefix,
+      secretHex,
     ].join(KEY_PREFIX_SEPARATOR);
     const hash = await sha256Hex(rawKey);
 
     const newKeyId = await ctx.db.insert("apiKeys", {
       hash,
-      lookupPrefix: args.lookupPrefix,
+      lookupPrefix,
       keyPrefix: oldKey.keyPrefix,
       type: oldKey.type,
       env: oldKey.env,
@@ -1102,14 +1273,7 @@ export const rotate = mutation({
       rotatedFromId: args.keyId,
     });
 
-    await ctx.db.insert("apiKeyEvents", {
-      keyId: args.keyId,
-      ownerId: oldKey.ownerId,
-      eventType: "key.rotated",
-      metadata: { newKeyId },
-      timestamp: now,
-    });
-
+    log.info("key.rotated", { keyId: args.keyId, newKeyId, ownerId: oldKey.ownerId });
     return { newKeyId, newKey: rawKey, oldKeyExpiresAt: gracePeriodEnd };
   },
 });
@@ -1117,16 +1281,20 @@ export const rotate = mutation({
 export const update = mutation({
   args: {
     keyId: v.id("apiKeys"),
+    ownerId: v.string(),
     name: v.optional(v.string()),
     scopes: v.optional(v.array(v.string())),
     tags: v.optional(v.array(v.string())),
     metadata: v.optional(jsonValue),
   },
   returns: v.null(),
-  handler: async (ctx, { keyId, ...updates }) => {
+  handler: async (ctx, { keyId, ownerId, ...updates }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
+    }
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
     if (TERMINAL_STATUSES.has(key.status as KeyStatus)) {
       throw new Error("cannot update terminal key");
@@ -1134,6 +1302,7 @@ export const update = mutation({
     if (updates.tags) {
       validateTags(updates.tags);
     }
+    validateSizeLimits({ metadata: updates.metadata, scopes: updates.scopes, tags: updates.tags, name: updates.name });
 
     const patch: Record<string, unknown> = {};
     if (updates.name !== undefined) patch.name = updates.name;
@@ -1143,13 +1312,7 @@ export const update = mutation({
 
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(keyId, patch);
-      await ctx.db.insert("apiKeyEvents", {
-        keyId,
-        ownerId: key.ownerId,
-        eventType: "key.updated",
-        metadata: { fields: Object.keys(patch) },
-        timestamp: Date.now(),
-      });
+      log.info("key.updated", { keyId, ownerId, fields: Object.keys(patch) });
     }
 
     return null;
@@ -1157,12 +1320,18 @@ export const update = mutation({
 });
 
 export const disable = mutation({
-  args: { keyId: v.id("apiKeys") },
+  args: {
+    keyId: v.id("apiKeys"),
+    ownerId: v.string(),
+  },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
+  handler: async (ctx, { keyId, ownerId }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
+    }
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
     if (key.status === "disabled") {
       return null;
@@ -1171,23 +1340,24 @@ export const disable = mutation({
       throw new Error("can only disable active keys");
     }
     await ctx.db.patch(keyId, { status: "disabled" });
-    await ctx.db.insert("apiKeyEvents", {
-      keyId,
-      ownerId: key.ownerId,
-      eventType: "key.disabled",
-      timestamp: Date.now(),
-    });
+    log.info("key.disabled", { keyId, ownerId });
     return null;
   },
 });
 
 export const enable = mutation({
-  args: { keyId: v.id("apiKeys") },
+  args: {
+    keyId: v.id("apiKeys"),
+    ownerId: v.string(),
+  },
   returns: v.null(),
-  handler: async (ctx, { keyId }) => {
+  handler: async (ctx, { keyId, ownerId }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
+    }
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
     if (key.status === "active") {
       return null;
@@ -1196,12 +1366,7 @@ export const enable = mutation({
       throw new Error("can only enable disabled keys");
     }
     await ctx.db.patch(keyId, { status: "active" });
-    await ctx.db.insert("apiKeyEvents", {
-      keyId,
-      ownerId: key.ownerId,
-      eventType: "key.enabled",
-      timestamp: Date.now(),
-    });
+    log.info("key.enabled", { keyId, ownerId });
     return null;
   },
 });
@@ -1213,17 +1378,29 @@ export const configure = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    if (args.cleanupIntervalMs !== undefined && args.cleanupIntervalMs <= 0) {
+      throw new Error("cleanupIntervalMs must be > 0");
+    }
+    if (args.defaultExpiryMs !== undefined && args.defaultExpiryMs <= 0) {
+      throw new Error("defaultExpiryMs must be > 0");
+    }
+
     const existing = await ctx.db.query("config").first();
+    const oldValues = existing
+      ? { cleanupIntervalMs: existing.cleanupIntervalMs, defaultExpiryMs: existing.defaultExpiryMs }
+      : {};
+
     if (existing) {
       await ctx.db.patch(existing._id, args);
     } else {
       await ctx.db.insert("config", args);
     }
+
+    log.info("config.updated", { old: oldValues, new: args });
     return null;
   },
 });
 ```
-
 
 ---
 
@@ -1239,30 +1416,52 @@ import { jsonValue } from "./validators.js";
 
 const counter = new ShardedCounter(components.shardedCounter);
 
+const DEFAULT_PAGE_SIZE = 100;
+
+const keyItemValidator = v.object({
+  keyId: v.id("apiKeys"),
+  name: v.string(),
+  lookupPrefix: v.string(),
+  type: KEY_TYPE,
+  env: v.string(),
+  scopes: v.array(v.string()),
+  tags: v.array(v.string()),
+  status: KEY_STATUS,
+  metadata: v.optional(jsonValue),
+  remaining: v.optional(v.number()),
+  expiresAt: v.optional(v.number()),
+  createdAt: v.number(),
+  lastUsedAt: v.optional(v.number()),
+});
+
+function mapKey(k: any) {
+  return {
+    keyId: k._id,
+    name: k.name,
+    lookupPrefix: k.lookupPrefix,
+    type: k.type,
+    env: k.env,
+    scopes: k.scopes,
+    tags: k.tags,
+    status: k.status,
+    metadata: k.metadata,
+    remaining: k.remaining,
+    expiresAt: k.expiresAt,
+    createdAt: k._creationTime,
+    lastUsedAt: k.lastUsedAt,
+  };
+}
+
 export const list = query({
   args: {
     ownerId: v.string(),
     env: v.optional(v.string()),
     status: v.optional(KEY_STATUS),
+    limit: v.optional(v.number()),
   },
-  returns: v.array(
-    v.object({
-      keyId: v.id("apiKeys"),
-      name: v.string(),
-      lookupPrefix: v.string(),
-      type: KEY_TYPE,
-      env: v.string(),
-      scopes: v.array(v.string()),
-      tags: v.array(v.string()),
-      status: KEY_STATUS,
-      metadata: v.optional(jsonValue),
-      remaining: v.optional(v.number()),
-      expiresAt: v.optional(v.number()),
-      createdAt: v.number(),
-      lastUsedAt: v.optional(v.number()),
-    }),
-  ),
-  handler: async (ctx, { ownerId, env, status }) => {
+  returns: v.array(keyItemValidator),
+  handler: async (ctx, { ownerId, env, status, limit }) => {
+    const pageSize = limit ?? DEFAULT_PAGE_SIZE;
     let keysQuery;
     if (env) {
       keysQuery = ctx.db
@@ -1283,23 +1482,8 @@ export const list = query({
         .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId));
     }
 
-    const keys = await keysQuery.collect();
-
-    return keys.map((k) => ({
-      keyId: k._id,
-      name: k.name,
-      lookupPrefix: k.lookupPrefix,
-      type: k.type,
-      env: k.env,
-      scopes: k.scopes,
-      tags: k.tags,
-      status: k.status,
-      metadata: k.metadata,
-      remaining: k.remaining,
-      expiresAt: k.expiresAt,
-      createdAt: k._creationTime,
-      lastUsedAt: k.lastUsedAt,
-    }));
+    const keys = await keysQuery.take(pageSize);
+    return keys.map(mapKey);
   },
 });
 
@@ -1307,93 +1491,50 @@ export const listByTag = query({
   args: {
     ownerId: v.string(),
     tag: v.string(),
+    limit: v.optional(v.number()),
   },
-  returns: v.array(
-    v.object({
-      keyId: v.id("apiKeys"),
-      name: v.string(),
-      lookupPrefix: v.string(),
-      type: KEY_TYPE,
-      env: v.string(),
-      scopes: v.array(v.string()),
-      tags: v.array(v.string()),
-      status: KEY_STATUS,
-      metadata: v.optional(jsonValue),
-      remaining: v.optional(v.number()),
-      expiresAt: v.optional(v.number()),
-      createdAt: v.number(),
-      lastUsedAt: v.optional(v.number()),
-    }),
-  ),
-  handler: async (ctx, { ownerId, tag }) => {
-    const keys = await ctx.db
+  returns: v.array(keyItemValidator),
+  handler: async (ctx, { ownerId, tag, limit }) => {
+    const pageSize = limit ?? DEFAULT_PAGE_SIZE;
+    const allKeys = await ctx.db
       .query("apiKeys")
       .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId))
       .collect();
 
-    return keys
+    return allKeys
       .filter((k) => k.tags.includes(tag))
-      .map((k) => ({
-        keyId: k._id,
-        name: k.name,
-        lookupPrefix: k.lookupPrefix,
-        type: k.type,
-        env: k.env,
-        scopes: k.scopes,
-        tags: k.tags,
-        status: k.status,
-        metadata: k.metadata,
-        remaining: k.remaining,
-        expiresAt: k.expiresAt,
-        createdAt: k._creationTime,
-        lastUsedAt: k.lastUsedAt,
-      }));
+      .slice(0, pageSize)
+      .map(mapKey);
   },
 });
 
 export const getUsage = query({
   args: {
     keyId: v.id("apiKeys"),
-    period: v.optional(
-      v.object({
-        start: v.number(),
-        end: v.number(),
-      }),
-    ),
+    ownerId: v.string(),
   },
   returns: v.object({
     total: v.number(),
     remaining: v.optional(v.number()),
-    lastUsedAt: v.optional(v.number()),
   }),
-  handler: async (ctx, { keyId, period }) => {
+  handler: async (ctx, { keyId, ownerId }) => {
     const key = await ctx.db.get(keyId);
     if (!key) {
       throw new Error("key not found");
     }
-
-    let total: number;
-    if (period) {
-      const events = await ctx.db
-        .query("apiKeyEvents")
-        .withIndex("by_key", (q) =>
-          q.eq("keyId", keyId).gte("timestamp", period.start).lte("timestamp", period.end),
-        )
-        .collect();
-      total = events.filter((e) => e.eventType === "key.validated").length;
-    } else {
-      total = await counter.count(ctx, keyId);
+    if (key.ownerId !== ownerId) {
+      throw new Error("unauthorized: key does not belong to owner");
     }
+
+    const total = await counter.count(ctx, keyId);
 
     return {
       total,
       remaining: key.remaining,
-      lastUsedAt: key.lastUsedAt,
     };
   },
 });
 ```
-
 
 ---
 
@@ -1416,4 +1557,3 @@ export function register(
 
 export default { register, schema, modules };
 ```
-

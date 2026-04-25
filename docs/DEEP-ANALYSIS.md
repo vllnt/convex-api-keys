@@ -1,5 +1,7 @@
 # Deep Analysis: @vllnt/convex-api-keys
 
+> Historical snapshot: this document captures a 2026-03-24 pre-v0.2 review. It is kept for historical context, not as current release guidance. Since then the package added `ownerId` auth-boundary checks, server-side secret generation, structured audit logging, bounded list APIs, and removed the internal rate-limiter / aggregate / crons architecture discussed below. For current behavior, use `README.md` and `docs/API.md`.
+
 **Mode**: Deep | **Perspectives**: 7 (Security, Adversarial, Performance, Scalability, Extensibility, Observability, API Design)
 **Date**: 2026-03-24 | **Verification**: static repo review + `pnpm test` + `pnpm typecheck`
 
