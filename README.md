@@ -1,3 +1,4 @@
+[![Convex Component](https://www.convex.dev/components/badge/vllnt/convex-api-keys)](https://www.convex.dev/components/vllnt/convex-api-keys)
 [![npm version](https://img.shields.io/npm/v/@vllnt/convex-api-keys)](https://www.npmjs.com/package/@vllnt/convex-api-keys)
 [![CI](https://github.com/vllnt/convex-api-keys/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-api-keys/actions/workflows/ci.yml)
 [![License](https://img.shields.io/npm/l/@vllnt/convex-api-keys)](./LICENSE)
