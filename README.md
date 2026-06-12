@@ -219,4 +219,4 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR 
 
 ## License
 
-Apache-2.0
+MIT

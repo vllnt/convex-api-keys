@@ -171,7 +171,7 @@ Stored in DB:
 | `tsconfig.json` / `tsconfig.build.json` | CREATE | TypeScript configs |
 | `vitest.config.mts` | CREATE | vitest + edge-runtime |
 | `README.md` | CREATE | Comprehensive docs |
-| `LICENSE` | CREATE | Apache-2.0 |
+| `LICENSE` | CREATE | MIT |
 
 **Files:** 16 create | 0 modify | 0 affected
 **Reuse:**
