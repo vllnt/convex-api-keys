@@ -1,6 +1,4 @@
-# API Reference
-
-Full API reference for `@vllnt/convex-api-keys`.
+# API Reference — @vllnt/convex-api-keys
 
 **Compatibility:** `convex@^1.36.1`
 

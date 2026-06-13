@@ -1,7 +1,8 @@
-[![Convex Component](https://www.convex.dev/components/badge/vllnt/convex-api-keys)](https://www.convex.dev/components/vllnt/convex-api-keys)
-[![npm version](https://img.shields.io/npm/v/@vllnt/convex-api-keys)](https://www.npmjs.com/package/@vllnt/convex-api-keys)
+<!-- Badges -->
+[![Convex Component](https://img.shields.io/badge/convex-component-EE342F.svg)](https://www.convex.dev/components)
+[![npm version](https://img.shields.io/npm/v/@vllnt/convex-api-keys.svg)](https://www.npmjs.com/package/@vllnt/convex-api-keys)
 [![CI](https://github.com/vllnt/convex-api-keys/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-api-keys/actions/workflows/ci.yml)
-[![License](https://img.shields.io/npm/l/@vllnt/convex-api-keys)](./LICENSE)
+[![License](https://img.shields.io/npm/l/@vllnt/convex-api-keys.svg)](./LICENSE)
 
 # @vllnt/convex-api-keys
 
@@ -178,6 +179,8 @@ create() → ACTIVE ──→ DISABLED (reversible via enable())
 
 ## API Reference
 
+See [docs/API.md](docs/API.md). Summary:
+
 | Method | Ctx | Description |
 |--------|-----|-------------|
 | `create(ctx, options)` | mutation | Create a new API key |
@@ -217,6 +220,14 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR guidelines.
 
+## Author
+
+Built by [bntvllnt](https://github.com/bntvllnt) · [bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
+
+Part of the [@vllnt](https://github.com/vllnt) Convex component fleet — [vllnt.com](https://vllnt.com)
+
+If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
