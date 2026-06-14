@@ -107,3 +107,34 @@ Set runtime configuration. Admin-only surface — no ownerId scoping. Values mus
 | `expiresAt` | must be in the future |
 | `cleanupIntervalMs` | must be > 0 |
 | `defaultExpiryMs` | must be > 0 |
+
+## Key Format
+
+```
+{prefix}_{type}_{env}_{random8}_{secret64}
+
+Examples:
+  myapp_secret_live_a1b2c3d4_<hex>    ← production secret
+  myapp_pub_test_e5f6g7h8_<hex>       ← test publishable
+```
+
+## Key Lifecycle
+
+```
+create() → ACTIVE ──→ DISABLED (reversible via enable())
+                  ──→ REVOKED  (terminal)
+                  ──→ ROTATING (grace period → EXPIRED)
+                  ──→ EXPIRED  (terminal, time-based)
+                  ──→ EXHAUSTED (terminal, remaining=0)
+```
+
+## Security Model
+
+This component protects against **accidental cross-tenant bugs in honest host apps**. The
+`ownerId` check prevents a bug from operating on another tenant's keys — it does NOT prevent a
+compromised host app from passing a forged `ownerId`.
+
+Integrators must derive `ownerId` from their own auth layer (e.g.,
+`ctx.auth.getUserIdentity()`) before passing it to the component. Secret material is generated
+server-side and only the SHA-256 hash is stored; the raw key is returned once at creation and is
+irrecoverable afterward.
