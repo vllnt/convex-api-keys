@@ -21,7 +21,6 @@ A sandboxed Convex component following the vllnt Component Standard (see the `co
 ```
 src/
 ├── shared.ts              # shared types, validators, crypto utils (sha256Hex, timingSafeEqual)
-├── log.ts                 # minimal structured logger (Convex-safe)
 ├── test.ts                # convex-test register() helper
 ├── client/
 │   ├── index.ts           # ApiKeys client class (consumer-facing API)
@@ -57,8 +56,8 @@ src/
   find the candidate row in O(1), then uses constant-time hash comparison to prevent timing attacks.
 - **No rate limiting in the component:** rate limiting belongs at the host's HTTP action/mutation
   layer where real caller context (IP, plan, auth) is available; the component has none.
-- **No event table:** structured logging (`log.ts`) replaces a `apiKeyEvents` DB table — eliminates
-  unbounded growth, O(N) scans, and retention complexity.
+- **No event table:** structured logging (via `@vllnt/logger`) replaces a `apiKeyEvents` DB table —
+  eliminates unbounded growth, O(N) scans, and retention complexity.
 - **`ownerId` as the only auth boundary:** all admin mutations assert `key.ownerId === args.ownerId`
   before any state change; this prevents cross-tenant bugs in honest host apps, not a hostile host.
 

@@ -14,11 +14,11 @@ import {
   validateSizeLimits,
   KEY_PREFIX_SEPARATOR,
 } from "../shared.js";
-import { createLogger } from "../log.js";
+import { createConvexLogger } from "@vllnt/logger/convex";
 import { jsonValue } from "./validators.js";
 import type { KeyStatus } from "../shared.js";
 
-const log = createLogger("api-keys");
+const log = createConvexLogger("api-keys");
 
 const counter = new ShardedCounter(components.shardedCounter);
 

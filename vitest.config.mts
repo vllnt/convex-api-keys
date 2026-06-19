@@ -10,7 +10,6 @@ export default defineConfig({
     coverage: {
       include: [
         "src/shared.ts",
-        "src/log.ts",
         "src/test.ts",
         "src/client/index.ts",
         "src/component/mutations.ts",
