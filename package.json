@@ -50,7 +50,8 @@
     "release": "npm version patch && npm publish && git push --follow-tags"
   },
   "dependencies": {
-    "@convex-dev/sharded-counter": "^0.2.0"
+    "@convex-dev/sharded-counter": "^0.2.0",
+    "@vllnt/logger": "^0.1.2"
   },
   "peerDependencies": {
     "convex": "^1.36.1"
