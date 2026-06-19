@@ -87,7 +87,7 @@ access to the selected Convex project.
 
 ## Docs sync (MANDATORY)
 
-When any of these change, update the matching docs in the SAME commit (then `pnpm generate:llms`):
+When any of these change, update the matching docs in the SAME commit:
 
 | Change | Update |
 |--------|--------|

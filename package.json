@@ -43,8 +43,7 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --typecheck --clearScreen false",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
-    "generate:llms": "node -e \"const fs=require('fs');const files=['README.md','CHANGELOG.md','docs/API.md','src/shared.ts','src/client/types.ts','src/client/index.ts','src/component/schema.ts','src/component/validators.ts','src/component/mutations.ts','src/component/queries.ts','src/test.ts'];let out='# @vllnt/convex-api-keys — Full Source\\n\\nAuto-generated. Do not edit manually.\\n';for(const f of files){out+='\\n---\\n\\n## '+f+'\\n\\n';if(f.endsWith('.md')){out+=fs.readFileSync(f,'utf8')}else{out+='\\`\\`\\`ts\\n'+fs.readFileSync(f,'utf8')+'\\`\\`\\`'}out+='\\n'}fs.writeFileSync('llms-full.txt',out)\"",
-    "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm typecheck && pnpm generate:llms",
+    "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm typecheck",
     "prepublishOnly": "npm whoami || npm login",
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
     "release": "npm version patch && npm publish && git push --follow-tags"
