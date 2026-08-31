@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Refresh all direct dependencies to their latest compatible releases for canary validation.
 - Require `convex@^1.45.0`, update `convex-test` to `^0.0.56`, and update
   `@convex-dev/sharded-counter` to `^0.2.1`.
 
