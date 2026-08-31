@@ -13,8 +13,13 @@ Convex agent skills for common tasks can be installed by running `npx convex ai-
 Secure API key management as a Convex component — create, validate, revoke, rotate, and track usage
 with owner-scoped admin APIs, server-side secret generation, and structured audit logging.
 
-A sandboxed Convex component following the vllnt Component Standard (see the `convex-components` hub
-`.claude/rules/component-standard.md`). `CLAUDE.md` is a verbatim mirror of this file.
+A sandboxed Convex component following the vllnt Component Standard (see the `oss-packages` hub
+`AGENTS.md`).
+
+## Agent instructions
+
+`AGENTS.md` is the sole agent-instruction source for this repository. Do not add
+`CLAUDE.md` or `.claude` content.
 
 ## Architecture
 
@@ -70,6 +75,12 @@ src/
 - Terminal statuses (`revoked`, `expired`, `exhausted`) cannot be transitioned out of.
 - 100% test coverage is BLOCKING (`vitest.config.mts` thresholds).
 - Runtime deps: only official `@convex-dev/*` + `@vllnt/*`.
+
+## Generated code
+
+- Every `**/_generated/**` file is owned exclusively by Convex CLI codegen.
+- Never create, edit, lint, or format generated files manually.
+- Run `pnpm codegen` to regenerate them and commit the generated output unchanged.
 
 ## Development
 

@@ -35,19 +35,21 @@
   "module": "./dist/client/index.js",
   "scripts": {
     "build": "tsc --project ./tsconfig.build.json",
-    "build:codegen": "pnpm convex codegen --component-dir ./src/component && pnpm build",
+    "build:codegen": "pnpm codegen && pnpm build",
     "build:clean": "rm -rf dist *.tsbuildinfo && pnpm build:codegen",
     "typecheck": "tsc --noEmit",
     "typecheck:ci": "tsc --noEmit --project tsconfig.ci.json",
-    "lint": "eslint .",
-    "test": "vitest run --passWithNoTests",
+    "lint": "pnpm check:agents && eslint .",
+    "test": "pnpm check:agents && vitest run --passWithNoTests",
     "test:watch": "vitest --typecheck --clearScreen false",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "generate:llms": "node -e \"const fs=require('fs');const files=['README.md','CHANGELOG.md','docs/API.md','src/shared.ts','src/client/types.ts','src/client/index.ts','src/component/schema.ts','src/component/validators.ts','src/component/mutations.ts','src/component/queries.ts','src/test.ts'];let out='# @vllnt/convex-api-keys — Full Source\\n\\nAuto-generated. Do not edit manually.\\n';for(const f of files){out+='\\n---\\n\\n## '+f+'\\n\\n';if(f.endsWith('.md')){out+=fs.readFileSync(f,'utf8')}else{out+='\\`\\`\\`ts\\n'+fs.readFileSync(f,'utf8')+'\\`\\`\\`'}out+='\\n'}fs.writeFileSync('llms-full.txt',out)\"",
     "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm typecheck && pnpm generate:llms",
     "prepublishOnly": "npm whoami || npm login",
     "alpha": "npm version prerelease --preid alpha && npm publish --tag alpha && git push --follow-tags",
-    "release": "npm version patch && npm publish && git push --follow-tags"
+    "release": "npm version patch && npm publish && git push --follow-tags",
+    "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",
+    "codegen": "pnpm convex codegen --component-dir ./src/component"
   },
   "dependencies": {
     "@convex-dev/sharded-counter": "^0.2.1"
