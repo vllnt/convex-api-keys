@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Require `convex@^1.45.0`, update `convex-test` to `^0.0.56`, and update
+  `@convex-dev/sharded-counter` to `^0.2.1`.
+
 ## 0.2.0
 
 ### Breaking Changes

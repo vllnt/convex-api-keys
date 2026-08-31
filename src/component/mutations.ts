@@ -168,7 +168,7 @@ export const validate = mutation({
     }
 
     if (matchedKey.expiresAt && matchedKey.expiresAt <= now) {
-      await ctx.db.patch(matchedKey._id, { status: "expired" });
+      await ctx.db.patch("apiKeys", matchedKey._id, { status: "expired" });
       log.info("key.expired", { keyId: matchedKey._id });
       return { valid: false as const, reason: "expired" };
     }
@@ -178,7 +178,7 @@ export const validate = mutation({
       matchedKey.gracePeriodEnd &&
       matchedKey.gracePeriodEnd <= now
     ) {
-      await ctx.db.patch(matchedKey._id, { status: "expired" });
+      await ctx.db.patch("apiKeys", matchedKey._id, { status: "expired" });
       log.info("key.expired", { keyId: matchedKey._id, reason: "grace_period_ended" });
       return { valid: false as const, reason: "expired" };
     }
@@ -186,7 +186,7 @@ export const validate = mutation({
     let newRemaining = matchedKey.remaining;
     if (matchedKey.remaining !== undefined) {
       if (matchedKey.remaining <= 0) {
-        await ctx.db.patch(matchedKey._id, { status: "exhausted" });
+        await ctx.db.patch("apiKeys", matchedKey._id, { status: "exhausted" });
         log.info("key.exhausted", { keyId: matchedKey._id });
         return { valid: false as const, reason: "exhausted" };
       }
@@ -207,7 +207,7 @@ export const validate = mutation({
       patch.lastUsedAt = now;
     }
     if (Object.keys(patch).length > 0) {
-      await ctx.db.patch(matchedKey._id, patch);
+      await ctx.db.patch("apiKeys", matchedKey._id, patch);
     }
     if (newRemaining === 0) {
       log.info("key.exhausted", { keyId: matchedKey._id });
@@ -238,7 +238,7 @@ export const revoke = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { keyId, ownerId }) => {
-    const key = await ctx.db.get(keyId);
+    const key = await ctx.db.get("apiKeys", keyId);
     if (!key) {
       throw new Error("key not found");
     }
@@ -248,7 +248,7 @@ export const revoke = mutation({
     if (key.status === "revoked") {
       return null;
     }
-    await ctx.db.patch(keyId, { status: "revoked", revokedAt: Date.now() });
+    await ctx.db.patch("apiKeys", keyId, { status: "revoked", revokedAt: Date.now() });
     log.info("key.revoked", { keyId, ownerId });
     return null;
   },
@@ -279,7 +279,7 @@ export const revokeByTag = mutation({
     const now = Date.now();
     for (const key of allKeys) {
       if (key.tags.includes(tag)) {
-        await ctx.db.patch(key._id, { status: "revoked", revokedAt: now });
+        await ctx.db.patch("apiKeys", key._id, { status: "revoked", revokedAt: now });
         revokedCount++;
       }
     }
@@ -303,7 +303,7 @@ export const rotate = mutation({
     oldKeyExpiresAt: v.number(),
   }),
   handler: async (ctx, args) => {
-    const oldKey = await ctx.db.get(args.keyId);
+    const oldKey = await ctx.db.get("apiKeys", args.keyId);
     if (!oldKey) {
       throw new Error("key not found");
     }
@@ -324,7 +324,7 @@ export const rotate = mutation({
     const now = Date.now();
     const gracePeriodEnd = now + gracePeriodMs;
 
-    await ctx.db.patch(args.keyId, {
+    await ctx.db.patch("apiKeys", args.keyId, {
       status: "rotating",
       gracePeriodEnd,
     });
@@ -374,7 +374,7 @@ export const update = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { keyId, ownerId, ...updates }) => {
-    const key = await ctx.db.get(keyId);
+    const key = await ctx.db.get("apiKeys", keyId);
     if (!key) {
       throw new Error("key not found");
     }
@@ -396,7 +396,7 @@ export const update = mutation({
     if (updates.metadata !== undefined) patch.metadata = updates.metadata;
 
     if (Object.keys(patch).length > 0) {
-      await ctx.db.patch(keyId, patch);
+      await ctx.db.patch("apiKeys", keyId, patch);
       log.info("key.updated", { keyId, ownerId, fields: Object.keys(patch) });
     }
 
@@ -411,7 +411,7 @@ export const disable = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { keyId, ownerId }) => {
-    const key = await ctx.db.get(keyId);
+    const key = await ctx.db.get("apiKeys", keyId);
     if (!key) {
       throw new Error("key not found");
     }
@@ -424,7 +424,7 @@ export const disable = mutation({
     if (key.status !== "active") {
       throw new Error("can only disable active keys");
     }
-    await ctx.db.patch(keyId, { status: "disabled" });
+    await ctx.db.patch("apiKeys", keyId, { status: "disabled" });
     log.info("key.disabled", { keyId, ownerId });
     return null;
   },
@@ -437,7 +437,7 @@ export const enable = mutation({
   },
   returns: v.null(),
   handler: async (ctx, { keyId, ownerId }) => {
-    const key = await ctx.db.get(keyId);
+    const key = await ctx.db.get("apiKeys", keyId);
     if (!key) {
       throw new Error("key not found");
     }
@@ -450,7 +450,7 @@ export const enable = mutation({
     if (key.status !== "disabled") {
       throw new Error("can only enable disabled keys");
     }
-    await ctx.db.patch(keyId, { status: "active" });
+    await ctx.db.patch("apiKeys", keyId, { status: "active" });
     log.info("key.enabled", { keyId, ownerId });
     return null;
   },
@@ -476,7 +476,7 @@ export const configure = mutation({
       : {};
 
     if (existing) {
-      await ctx.db.patch(existing._id, args);
+      await ctx.db.patch("config", existing._id, args);
     } else {
       await ctx.db.insert("config", args);
     }
