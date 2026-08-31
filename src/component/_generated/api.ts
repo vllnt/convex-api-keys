@@ -10,6 +10,7 @@
 
 import type * as mutations from "../mutations.js";
 import type * as queries from "../queries.js";
+import type * as validators from "../validators.js";
 
 import type {
   ApiFromModules,
@@ -21,6 +22,7 @@ import { anyApi, componentsGeneric } from "convex/server";
 const fullApi: ApiFromModules<{
   mutations: typeof mutations;
   queries: typeof queries;
+  validators: typeof validators;
 }> = anyApi as any;
 
 /**

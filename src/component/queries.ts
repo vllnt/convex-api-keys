@@ -109,7 +109,7 @@ export const getUsage = query({
     remaining: v.optional(v.number()),
   }),
   handler: async (ctx, { keyId, ownerId }) => {
-    const key = await ctx.db.get(keyId);
+    const key = await ctx.db.get("apiKeys", keyId);
     if (!key) {
       throw new Error("key not found");
     }

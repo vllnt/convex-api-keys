@@ -80,11 +80,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       rotate: FunctionReference<
         "mutation",
         "internal",
-        {
-          gracePeriodMs?: number;
-          keyId: string;
-          ownerId: string;
-        },
+        { gracePeriodMs?: number; keyId: string; ownerId: string },
         { newKey: string; newKeyId: string; oldKeyExpiresAt: number },
         Name
       >;
@@ -134,6 +130,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         "internal",
         {
           env?: string;
+          limit?: number;
           ownerId: string;
           status?:
             | "active"
@@ -169,7 +166,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
       listByTag: FunctionReference<
         "query",
         "internal",
-        { ownerId: string; tag: string },
+        { limit?: number; ownerId: string; tag: string },
         Array<{
           createdAt: number;
           env: string;
