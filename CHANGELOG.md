@@ -2,8 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Keep expired keys terminal across repeated validation, restrict rotation to active unlimited-use
+  keys, and cap the old key's grace window at its absolute expiry.
+
 ### Changed
 
+- Enforce the documented 100% statement, branch, function, and line coverage gate.
 - Treat Convex `_generated` output as CLI-owned, exclude it from formatting, and expose a
   dedicated codegen script.
 - Refresh all direct dependencies to their latest compatible releases for canary validation.

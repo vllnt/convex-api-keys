@@ -157,6 +157,11 @@ export const validate = mutation({
       return { valid: false as const, reason: "revoked" };
     }
 
+    if (matchedKey.status === "expired") {
+      log.info("key.validate_failed", { keyId: matchedKey._id, reason: "expired" });
+      return { valid: false as const, reason: "expired" };
+    }
+
     if (matchedKey.status === "disabled") {
       log.info("key.validate_failed", { keyId: matchedKey._id, reason: "disabled" });
       return { valid: false as const, reason: "disabled" };
@@ -313,6 +318,17 @@ export const rotate = mutation({
     if (TERMINAL_STATUSES.has(oldKey.status as KeyStatus)) {
       throw new Error("cannot rotate a terminal key");
     }
+    if (oldKey.status !== "active") {
+      throw new Error("can only rotate active keys");
+    }
+    if (oldKey.remaining !== undefined) {
+      throw new Error("cannot rotate finite-use keys");
+    }
+
+    const now = Date.now();
+    if (oldKey.expiresAt !== undefined && oldKey.expiresAt <= now) {
+      throw new Error("cannot rotate an expired key");
+    }
 
     const gracePeriodMs = args.gracePeriodMs ?? 3600000;
     if (gracePeriodMs < MIN_GRACE_PERIOD_MS || gracePeriodMs > MAX_GRACE_PERIOD_MS) {
@@ -321,8 +337,10 @@ export const rotate = mutation({
       );
     }
 
-    const now = Date.now();
-    const gracePeriodEnd = now + gracePeriodMs;
+    const gracePeriodEnd = Math.min(
+      now + gracePeriodMs,
+      oldKey.expiresAt ?? Number.POSITIVE_INFINITY,
+    );
 
     await ctx.db.patch("apiKeys", args.keyId, {
       status: "rotating",

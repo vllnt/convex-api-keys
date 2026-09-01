@@ -5,7 +5,14 @@ import {
   sha256Hex,
   validateTag,
   validateTags,
+  validateEnv,
+  validateKeyPrefix,
+  validateSizeLimits,
   KEY_PREFIX_SEPARATOR,
+  MAX_METADATA_SIZE,
+  MAX_SCOPES,
+  MAX_STRING_LENGTH,
+  MAX_TAGS,
 } from "./shared.js";
 
 describe("parseKeyString", () => {
@@ -116,6 +123,37 @@ describe("validateTags", () => {
 
   test("throws on first invalid tag", () => {
     expect(() => validateTags(["valid", "-bad"])).toThrow("Invalid tag");
+  });
+});
+
+describe("input size and token validation", () => {
+  test("rejects invalid and oversized key prefixes", () => {
+    expect(() => validateKeyPrefix("bad_prefix")).toThrow("Invalid keyPrefix");
+    expect(() => validateKeyPrefix("a".repeat(MAX_STRING_LENGTH + 1))).toThrow(
+      "keyPrefix must be <=",
+    );
+  });
+
+  test("rejects invalid and oversized environments", () => {
+    expect(() => validateEnv("bad_env")).toThrow("Invalid env");
+    expect(() => validateEnv("a".repeat(MAX_STRING_LENGTH + 1))).toThrow(
+      "env must be <=",
+    );
+  });
+
+  test("rejects oversized metadata, scopes, tags, and names", () => {
+    expect(() =>
+      validateSizeLimits({ metadata: "x".repeat(MAX_METADATA_SIZE) }),
+    ).toThrow("metadata must be <=");
+    expect(() =>
+      validateSizeLimits({ scopes: Array.from({ length: MAX_SCOPES + 1 }, () => "scope") }),
+    ).toThrow("scopes must have <=");
+    expect(() =>
+      validateSizeLimits({ tags: Array.from({ length: MAX_TAGS + 1 }, () => "tag") }),
+    ).toThrow("tags must have <=");
+    expect(() => validateSizeLimits({ name: "x".repeat(MAX_STRING_LENGTH + 1) })).toThrow(
+      "name must be <=",
+    );
   });
 });
 
