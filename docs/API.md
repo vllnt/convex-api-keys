@@ -54,7 +54,7 @@ Bulk revoke all keys matching a tag. Covers `active`, `rotating`, and `disabled`
 
 ### rotate(ctx, { keyId, ownerId, gracePeriodMs? })
 
-Create a new key and put the old key in grace period. Both keys validate during the grace period. Secret material generated server-side.
+Create a new key and put the old key in grace period. Both keys validate during the grace period, capped by the old key's absolute expiry. Rotation requires an active unlimited-use key; finite-use keys must be replaced explicitly so their quota cannot be duplicated. Secret material is generated server-side.
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|

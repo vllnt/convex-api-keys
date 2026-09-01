@@ -2,12 +2,18 @@
 import { expect, test, describe, vi, beforeEach, afterEach } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api.js";
-import { register } from "../../src/test.js";
+import testSupport, { register } from "../../src/test.js";
 import shardedCounterTest from "@convex-dev/sharded-counter/test";
 
 const modules = import.meta.glob("./**/*.ts");
 
 const HOUR = 3600000;
+
+test("published test support exposes registration assets", () => {
+  expect(testSupport.register).toBe(register);
+  expect(testSupport.schema).toBeDefined();
+  expect(testSupport.modules).toBeDefined();
+});
 
 function setup() {
   const t = convexTest(undefined!, modules);
@@ -255,6 +261,11 @@ describe("expiry", () => {
     // Advance past grace period
     vi.advanceTimersByTime(HOUR + 1);
 
+    result = await t.mutation(api.example.validateKey, { key: created.key });
+    expect(result.valid).toBe(false);
+    expect(result.reason).toBe("expired");
+
+    // Persisted terminal state must remain terminal on every later validation.
     result = await t.mutation(api.example.validateKey, { key: created.key });
     expect(result.valid).toBe(false);
     expect(result.reason).toBe("expired");
@@ -548,6 +559,20 @@ describe("rotate", () => {
     expect(oldResult.valid).toBe(true);
   });
 
+  test("rotates publishable keys with the publishable key shape", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Publishable",
+      ownerId: "org_1",
+      type: "publishable",
+    });
+    const rotated = await t.mutation(api.example.rotateKey, {
+      keyId: created.keyId,
+      ownerId: "org_1",
+    });
+    expect(rotated.newKey).toContain("_pub_");
+  });
+
   test("rotated key preserves env (regression: was hardcoded to live)", async () => {
     const t = setup();
     const created = await t.mutation(api.example.createKey, {
@@ -568,6 +593,97 @@ describe("rotate", () => {
       key: rotated.newKey,
     });
     expect(result.valid).toBe(true);
+  });
+
+  test("cannot rotate a disabled or already-rotating key", async () => {
+    const t = setup();
+    const disabled = await t.mutation(api.example.createKey, {
+      name: "Disabled",
+      ownerId: "org_1",
+    });
+    await t.mutation(api.example.disableKey, {
+      keyId: disabled.keyId,
+      ownerId: "org_1",
+    });
+    await expect(
+      t.mutation(api.example.rotateKey, {
+        keyId: disabled.keyId,
+        ownerId: "org_1",
+      }),
+    ).rejects.toThrow("can only rotate active keys");
+
+    const rotating = await t.mutation(api.example.createKey, {
+      name: "Rotating",
+      ownerId: "org_1",
+    });
+    await t.mutation(api.example.rotateKey, {
+      keyId: rotating.keyId,
+      ownerId: "org_1",
+    });
+    await expect(
+      t.mutation(api.example.rotateKey, {
+        keyId: rotating.keyId,
+        ownerId: "org_1",
+      }),
+    ).rejects.toThrow("can only rotate active keys");
+  });
+
+  test("cannot rotate a finite-use key because it would duplicate quota", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, {
+      name: "Finite",
+      ownerId: "org_1",
+      remaining: 3,
+    });
+    await expect(
+      t.mutation(api.example.rotateKey, {
+        keyId: created.keyId,
+        ownerId: "org_1",
+      }),
+    ).rejects.toThrow("cannot rotate finite-use keys");
+  });
+
+  test("oldKeyExpiresAt honors an earlier absolute expiry", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const t = setup();
+      const created = await t.mutation(api.example.createKey, {
+        name: "Expiring",
+        ownerId: "org_1",
+        expiresAt: 2 * 60_000,
+      });
+      const rotated = await t.mutation(api.example.rotateKey, {
+        keyId: created.keyId,
+        ownerId: "org_1",
+        gracePeriodMs: HOUR,
+      });
+      expect(rotated.oldKeyExpiresAt).toBe(2 * 60_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("cannot rotate a key past its absolute expiry", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(0);
+      const t = setup();
+      const created = await t.mutation(api.example.createKey, {
+        name: "Expired before rotation",
+        ownerId: "org_1",
+        expiresAt: 2 * 60_000,
+      });
+      vi.advanceTimersByTime(2 * 60_000);
+      await expect(
+        t.mutation(api.example.rotateKey, {
+          keyId: created.keyId,
+          ownerId: "org_1",
+        }),
+      ).rejects.toThrow("cannot rotate an expired key");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("cannot rotate a revoked key", async () => {
