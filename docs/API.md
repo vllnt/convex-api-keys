@@ -1,6 +1,7 @@
 # API Reference — @vllnt/convex-api-keys
 
-**Compatibility:** `convex@^1.36.1`
+**Compatibility:** current `main` / `canary` requires `convex@^1.45.0`. Stable
+`0.2.0` requires `convex@^1.36.1`.
 
 ## ApiKeys Class
 
@@ -9,7 +10,7 @@ import { ApiKeys } from "@vllnt/convex-api-keys";
 import { components } from "./_generated/api";
 
 const apiKeys = new ApiKeys(components.apiKeys, {
-  prefix: "myapp",      // key prefix (default: "vk")
+  prefix: "myapp", // key prefix (default: "vk")
   defaultType: "secret", // "secret" | "publishable" (default: "secret")
 });
 ```
@@ -18,19 +19,20 @@ const apiKeys = new ApiKeys(components.apiKeys, {
 
 ### create(ctx, options)
 
-Create a new API key. Secret material is generated server-side. Returns the raw key once — only the hash is stored.
+Create a new API key. Secret material is generated server-side. Returns the raw
+key once — only the hash is stored.
 
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | `string` | yes | Display name (max 256 chars) |
-| `ownerId` | `string` | yes | Tenant/org/user ID |
-| `type` | `"secret" \| "publishable"` | no | Key type (default from config) |
-| `scopes` | `string[]` | no | Permission scopes (max 50) |
-| `tags` | `string[]` | no | Filterable tags (max 20) |
-| `env` | `string` | no | Environment (default: `"live"`, must match `^[a-zA-Z0-9-]+$`) |
-| `metadata` | `Record<string, unknown>` | no | Arbitrary JSON (max 4KB) |
-| `remaining` | `number` | no | Finite-use counter |
-| `expiresAt` | `number` | no | Expiry timestamp (ms) |
+| Param       | Type                        | Required | Description                                                   |
+| ----------- | --------------------------- | -------- | ------------------------------------------------------------- |
+| `name`      | `string`                    | yes      | Display name (max 256 chars)                                  |
+| `ownerId`   | `string`                    | yes      | Tenant/org/user ID                                            |
+| `type`      | `"secret" \| "publishable"` | no       | Key type (default from config)                                |
+| `scopes`    | `string[]`                  | no       | Permission scopes (max 50)                                    |
+| `tags`      | `string[]`                  | no       | Filterable tags (max 20)                                      |
+| `env`       | `string`                    | no       | Environment (default: `"live"`, must match `^[a-zA-Z0-9-]+$`) |
+| `metadata`  | `Record<string, unknown>`   | no       | Arbitrary JSON (max 4KB)                                      |
+| `remaining` | `number`                    | no       | Finite-use counter                                            |
+| `expiresAt` | `number`                    | no       | Expiry timestamp (ms)                                         |
 
 **Returns:** `{ keyId: string, key: string }`
 
@@ -38,9 +40,12 @@ Create a new API key. Secret material is generated server-side. Returns the raw 
 
 Validate a key and track usage. Decrements `remaining` if set.
 
-**Returns:** `{ valid: true, keyId, ownerId, type, env, scopes, tags, metadata, remaining }` or `{ valid: false, reason }`
+**Returns:**
+`{ valid: true, keyId, ownerId, type, env, scopes, tags, metadata, remaining }`
+or `{ valid: false, reason }`
 
-**Rejection reasons:** `"malformed"`, `"not_found"`, `"revoked"`, `"disabled"`, `"expired"`, `"exhausted"`
+**Rejection reasons:** `"malformed"`, `"not_found"`, `"revoked"`, `"disabled"`,
+`"expired"`, `"exhausted"`
 
 ### revoke(ctx, { keyId, ownerId })
 
@@ -48,31 +53,38 @@ Permanently revoke a key. Idempotent. Requires `ownerId` for auth boundary.
 
 ### revokeByTag(ctx, { ownerId, tag })
 
-Bulk revoke all keys matching a tag. Covers `active`, `rotating`, and `disabled` statuses.
+Bulk revoke all keys matching a tag. Covers `active`, `rotating`, and `disabled`
+statuses.
 
 **Returns:** `{ revokedCount: number }`
 
 ### rotate(ctx, { keyId, ownerId, gracePeriodMs? })
 
-Create a new key and put the old key in grace period. Both keys validate during the grace period, capped by the old key's absolute expiry. Rotation requires an active unlimited-use key; finite-use keys must be replaced explicitly so their quota cannot be duplicated. Secret material is generated server-side.
+Create a new key and put the old key in grace period. Both keys validate during
+the grace period, capped by the old key's absolute expiry. Rotation requires an
+active unlimited-use key; finite-use keys must be replaced explicitly so their
+quota cannot be duplicated. Secret material is generated server-side.
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
+| Param           | Type     | Default        | Description                         |
+| --------------- | -------- | -------------- | ----------------------------------- |
 | `gracePeriodMs` | `number` | `3600000` (1h) | Grace period (min 60s, max 30 days) |
 
 **Returns:** `{ newKeyId, newKey, oldKeyExpiresAt }`
 
 ### list(ctx, { ownerId, env?, status?, limit? })
 
-List keys for an owner. No secrets exposed. Paginated (default 100).
+Return a bounded array of keys for an owner (default limit 100), with no raw
+keys or hashes. There is no cursor or continuation token.
 
 ### listByTag(ctx, { ownerId, tag, limit? })
 
-List keys matching a specific tag. Paginated (default 100).
+Return a bounded array of keys matching a tag (default limit 100). There is no
+cursor or continuation token; repeating the call does not advance a page.
 
 ### update(ctx, { keyId, ownerId, name?, scopes?, tags?, metadata? })
 
-Update key metadata in-place without rotation. Requires `ownerId` for auth boundary.
+Update key metadata in-place without rotation. Requires `ownerId` for auth
+boundary.
 
 ### disable(ctx, { keyId, ownerId })
 
@@ -90,23 +102,24 @@ Get usage count for a key. Returns O(1) counter value.
 
 ### configure(ctx, { cleanupIntervalMs?, defaultExpiryMs? })
 
-Set runtime configuration. Admin-only surface — no ownerId scoping. Values must be > 0.
+Set runtime configuration. Admin-only surface — no ownerId scoping. Values must
+be > 0.
 
 ## Input Validation
 
-| Field | Constraint |
-|-------|-----------|
-| `keyPrefix` | `^[a-zA-Z0-9]+$` (no underscores) |
-| `env` | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing) |
-| `name` | max 256 characters |
-| `metadata` | max 4KB (JSON serialized) |
-| `scopes` | max 50 entries |
-| `tags` | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$` |
-| `gracePeriodMs` | min 60,000 (60s), max 2,592,000,000 (30 days) |
-| `remaining` | must be > 0 |
-| `expiresAt` | must be in the future |
-| `cleanupIntervalMs` | must be > 0 |
-| `defaultExpiryMs` | must be > 0 |
+| Field               | Constraint                                                   |
+| ------------------- | ------------------------------------------------------------ |
+| `keyPrefix`         | `^[a-zA-Z0-9]+$` (no underscores)                            |
+| `env`               | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing) |
+| `name`              | max 256 characters                                           |
+| `metadata`          | max 4KB (JSON serialized)                                    |
+| `scopes`            | max 50 entries                                               |
+| `tags`              | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$`   |
+| `gracePeriodMs`     | min 60,000 (60s), max 2,592,000,000 (30 days)                |
+| `remaining`         | must be > 0                                                  |
+| `expiresAt`         | must be in the future                                        |
+| `cleanupIntervalMs` | must be > 0                                                  |
+| `defaultExpiryMs`   | must be > 0                                                  |
 
 ## Key Format
 
@@ -130,11 +143,12 @@ create() → ACTIVE ──→ DISABLED (reversible via enable())
 
 ## Security Model
 
-This component protects against **accidental cross-tenant bugs in honest host apps**. The
-`ownerId` check prevents a bug from operating on another tenant's keys — it does NOT prevent a
-compromised host app from passing a forged `ownerId`.
+This component protects against **accidental cross-tenant bugs in honest host
+apps**. The `ownerId` check prevents a bug from operating on another tenant's
+keys — it does NOT prevent a compromised host app from passing a forged
+`ownerId`.
 
 Integrators must derive `ownerId` from their own auth layer (e.g.,
-`ctx.auth.getUserIdentity()`) before passing it to the component. Secret material is generated
-server-side and only the SHA-256 hash is stored; the raw key is returned once at creation and is
-irrecoverable afterward.
+`ctx.auth.getUserIdentity()`) before passing it to the component. Secret
+material is generated server-side and only the SHA-256 hash is stored; the raw
+key is returned once at creation and is irrecoverable afterward.
