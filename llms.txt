@@ -2,7 +2,7 @@
 
 > Secure API key management as a Convex component. Create, validate, revoke, rotate, and track usage with owner-scoped admin APIs, server-side secret generation, and structured audit logging.
 
-`@vllnt/convex-api-keys` is a publishable Convex component for multi-tenant API key management. Keys are stored as SHA-256 hashes, looked up by prefix, and never persisted in raw form. The package targets `convex@^1.36.1` and uses `@convex-dev/sharded-counter` for per-key usage counts.
+`@vllnt/convex-api-keys` is a publishable Convex component for multi-tenant API key management. Keys are stored as SHA-256 hashes, looked up by prefix, and never persisted in raw form. Current main/canary targets `convex@^1.45.0` (stable 0.2.0 targets `convex@^1.36.1`) and uses `@convex-dev/sharded-counter` for per-key usage counts.
 
 ## Docs
 
