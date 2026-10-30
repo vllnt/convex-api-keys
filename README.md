@@ -1,4 +1,5 @@
 <!-- Badges -->
+
 [![Convex Component](https://img.shields.io/badge/convex-component-EE342F.svg)](https://www.convex.dev/components)
 [![npm version](https://img.shields.io/npm/v/@vllnt/convex-api-keys.svg)](https://www.npmjs.com/package/@vllnt/convex-api-keys)
 [![CI](https://github.com/vllnt/convex-api-keys/actions/workflows/ci.yml/badge.svg)](https://github.com/vllnt/convex-api-keys/actions/workflows/ci.yml)
@@ -6,32 +7,50 @@
 
 # @vllnt/convex-api-keys
 
-Secure API key management as a [Convex component](https://docs.convex.dev/components) — create, validate, revoke, rotate, and track usage with built-in auth boundaries and structured audit logging.
+Secure API key management as a
+[Convex component](https://docs.convex.dev/components) — create, validate,
+revoke, rotate, and track usage with built-in auth boundaries and structured
+audit logging.
 
 ```ts
 const apiKeys = new ApiKeys(components.apiKeys, { prefix: "myapp" });
-const { key, keyId } = await apiKeys.create(ctx, { name: "SDK Key", ownerId: orgId });
+const { key, keyId } = await apiKeys.create(ctx, {
+  name: "SDK Key",
+  ownerId: orgId,
+});
 const result = await apiKeys.validate(ctx, { key: bearerToken });
 // result.valid → { keyId, ownerId, scopes, ... } | result.reason
 ```
 
 ## Features
 
-- **Secure by default** — SHA-256 hashed storage, constant-time comparison, prefix-indexed O(1) lookup, server-side secret generation.
-- **Auth boundary** — `ownerId` required on all admin mutations; prevents cross-tenant access.
+- **Secure by default** — SHA-256 hashed storage, constant-time comparison,
+  prefix-indexed O(1) lookup, server-side secret generation.
+- **Owner checks** — key-management methods match the supplied `ownerId`; the
+  host still authenticates and authorizes callers. `configure` is a separate
+  host-admin-only surface.
 - **Key types** — `secret` and `publishable` keys with type-encoded prefixes.
-- **Finite-use keys** — `remaining` counter with atomic decrement for one-time-use tokens.
+- **Finite-use keys** — `remaining` counter with atomic decrement for
+  one-time-use tokens.
 - **Disable / enable** — reversible pause without revoking.
-- **Rotation** — configurable grace period (60s–30d) where both old and new keys are valid.
-- **Bulk revoke by tag, tags & environments, multi-tenant scoping, usage tracking, input validation, structured audit logging.**
+- **Rotation** — configurable grace period (60s–30d) where both old and new keys
+  are valid.
+- **Bulk revoke by tag, tags & environments, multi-tenant scoping, usage
+  tracking, input validation, structured audit logging.**
 
 ## Installation
 
-Peer dependency: `convex@^1.36.1`
+The stable `latest` release is `0.2.0` (`convex@^1.36.1`). This README describes
+current `main` / `canary`, which requires `convex@^1.45.0`.
 
 ```bash
 npm install convex@^1.36.1 @vllnt/convex-api-keys
+# Opt into the current prerelease instead:
+npm install convex@^1.45.0 @vllnt/convex-api-keys@canary
 ```
+
+Canary releases are prereleases; pin the resolved version for reproducible
+installs.
 
 Register in your `convex/convex.config.ts`:
 
@@ -44,16 +63,43 @@ app.use(apiKeys);
 export default app;
 ```
 
-> **Rate limiting** is your responsibility — add `@convex-dev/rate-limiter` at your HTTP action/mutation layer where you have real caller context (IP, auth, plan tier). The component has none.
+> **Rate limiting** is your responsibility — add `@convex-dev/rate-limiter` at
+> your HTTP action/mutation layer where you have real caller context (IP, auth,
+> plan tier). The component has none.
 
 ## Usage
+
+Expose a host mutation that derives ownership from authenticated identity:
+
+```ts
+// convex/keys.ts
+import { ApiKeys } from "@vllnt/convex-api-keys";
+import { components } from "./_generated/api";
+import { mutation } from "./_generated/server";
+import { v } from "convex/values";
+
+const apiKeys = new ApiKeys(components.apiKeys);
+
+export const create = mutation({
+  args: { name: v.string() },
+  handler: async (ctx, { name }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Unauthenticated");
+    return apiKeys.create(ctx, { name, ownerId: identity.tokenIdentifier });
+  },
+});
+```
+
+Show the returned raw key only to its owner; do not log or persist it. For
+shared organization ownership, replace this mapping with a host authorization
+check. The following calls illustrate the API inside authorized server handlers:
 
 ```ts
 import { ApiKeys } from "@vllnt/convex-api-keys";
 import { components } from "./_generated/api";
 
 const apiKeys = new ApiKeys(components.apiKeys, {
-  prefix: "myapp",       // key prefix (default: "vk")
+  prefix: "myapp", // key prefix (default: "vk")
   defaultType: "secret",
 });
 
@@ -77,32 +123,41 @@ if (!result.valid) {
 const { ownerId, scopes, tags, env, type, metadata, remaining } = result;
 ```
 
-See [docs/API.md](docs/API.md) for the full method reference, key format, and lifecycle.
+See [docs/API.md](docs/API.md) for the full method reference, key format, and
+lifecycle.
 
 ## API Reference
 
-| Method | Ctx | Description |
-|--------|-----|-------------|
-| `create(ctx, options)` | mutation | Create a new API key |
-| `validate(ctx, { key })` | mutation | Validate and track usage |
-| `revoke(ctx, { keyId, ownerId })` | mutation | Permanently revoke a key |
-| `revokeByTag(ctx, { ownerId, tag })` | mutation | Bulk revoke by tag |
-| `rotate(ctx, { keyId, ownerId, gracePeriodMs? })` | mutation | Rotate with grace period |
-| `update(ctx, { keyId, ownerId, name?, ... })` | mutation | Update metadata in-place |
-| `disable(ctx, { keyId, ownerId })` | mutation | Temporarily disable |
-| `enable(ctx, { keyId, ownerId })` | mutation | Re-enable a disabled key |
-| `configure(ctx, { ... })` | mutation | Runtime config (admin-only) |
-| `list(ctx, { ownerId, env?, status?, limit? })` | query | List keys (paginated, default 100) |
-| `listByTag(ctx, { ownerId, tag, limit? })` | query | Filter by tag |
-| `getUsage(ctx, { keyId, ownerId })` | query | Usage counter (O(1)) |
+| Method                                            | Ctx      | Description                            |
+| ------------------------------------------------- | -------- | -------------------------------------- |
+| `create(ctx, options)`                            | mutation | Create a new API key                   |
+| `validate(ctx, { key })`                          | mutation | Validate and track usage               |
+| `revoke(ctx, { keyId, ownerId })`                 | mutation | Permanently revoke a key               |
+| `revokeByTag(ctx, { ownerId, tag })`              | mutation | Bulk revoke by tag                     |
+| `rotate(ctx, { keyId, ownerId, gracePeriodMs? })` | mutation | Rotate with grace period               |
+| `update(ctx, { keyId, ownerId, name?, ... })`     | mutation | Update metadata in-place               |
+| `disable(ctx, { keyId, ownerId })`                | mutation | Temporarily disable                    |
+| `enable(ctx, { keyId, ownerId })`                 | mutation | Re-enable a disabled key               |
+| `configure(ctx, { ... })`                         | mutation | Runtime config (admin-only)            |
+| `list(ctx, { ownerId, env?, status?, limit? })`   | query    | Bounded array (default 100; no cursor) |
+| `listByTag(ctx, { ownerId, tag, limit? })`        | query    | Filter by tag                          |
+| `getUsage(ctx, { keyId, ownerId })`               | query    | Usage counter (O(1))                   |
+
+`list` and `listByTag` return bounded arrays, not cursor-based pages; repeated
+calls do not advance through the remaining keys. Authorize reads and mutations
+in the host before supplying an `ownerId`.
 
 Full reference: [docs/API.md](docs/API.md).
 
 ## Security
 
-- Protects against **accidental cross-tenant bugs in honest host apps** — the `ownerId` check does NOT defend against a compromised host passing a forged `ownerId`.
-- Derive `ownerId` from your own auth layer (e.g. `ctx.auth.getUserIdentity()`) before passing it in.
-- Raw keys are never stored — only the SHA-256 hash; the raw value is returned once at creation.
+- Protects against **accidental cross-tenant bugs in honest host apps** — the
+  `ownerId` check does NOT defend against a compromised host passing a forged
+  `ownerId`.
+- Derive `ownerId` from your own auth layer (e.g. `ctx.auth.getUserIdentity()`)
+  before passing it in.
+- Raw keys are never stored — only the SHA-256 hash; the raw value is returned
+  once at creation.
 
 See [docs/API.md](docs/API.md).
 
@@ -120,13 +175,16 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR guidelines.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR
+guidelines.
 
 ## Author
 
-Built by [bntvllnt](https://github.com/bntvllnt) · [bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
+Built by [bntvllnt](https://github.com/bntvllnt) ·
+[bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
 
-Part of the [@vllnt](https://github.com/vllnt) Convex component fleet — [vllnt.com](https://vllnt.com)
+Part of the [@vllnt](https://github.com/vllnt) Convex component fleet —
+[vllnt.com](https://vllnt.com)
 
 If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
 
