@@ -1,7 +1,7 @@
 # API Reference — @vllnt/convex-api-keys
 
-**Compatibility:** current `main` / `canary` requires `convex@^1.45.0`. Stable
-`0.2.0` requires `convex@^1.36.1`.
+**Compatibility:** requires `convex@^1.45.0` (releases before `0.3.0` required
+`convex@^1.36.1`).
 
 ## ApiKeys Class
 

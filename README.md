@@ -40,17 +40,15 @@ const result = await apiKeys.validate(ctx, { key: bearerToken });
 
 ## Installation
 
-The stable `latest` release is `0.2.0` (`convex@^1.36.1`). This README describes
-current `main` / `canary`, which requires `convex@^1.45.0`.
+Requires `convex@^1.45.0`.
 
 ```bash
-npm install convex@^1.36.1 @vllnt/convex-api-keys
-# Opt into the current prerelease instead:
-npm install convex@^1.45.0 @vllnt/convex-api-keys@canary
+npm install convex @vllnt/convex-api-keys
 ```
 
-Canary releases are prereleases; pin the resolved version for reproducible
-installs.
+Prereleases are published under the `canary` dist-tag
+(`npm install @vllnt/convex-api-keys@canary`); pin the resolved version for
+reproducible installs.
 
 Register in your `convex/convex.config.ts`:
 
@@ -65,7 +63,8 @@ export default app;
 
 > **Rate limiting** is your responsibility — add `@convex-dev/rate-limiter` at
 > your HTTP action/mutation layer where you have real caller context (IP, auth,
-> plan tier). The component has none.
+> plan tier). The component has none. Scope enforcement is yours too: `validate`
+> returns the key's `scopes`; check them before acting.
 
 ## Usage
 
@@ -161,14 +160,20 @@ Full reference: [docs/API.md](docs/API.md).
 
 See [docs/API.md](docs/API.md).
 
-## Testing
+## Testing your app
+
+`@vllnt/convex-api-keys/test` exports `register(t, name = "apiKeys")` to mount
+the component in a `convex-test` instance. It needs `convex-test` and `vitest`
+(with Vite's `import.meta.glob`) in the consuming app:
 
 ```ts
+/// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { register } from "@vllnt/convex-api-keys/test";
 import shardedCounterTest from "@convex-dev/sharded-counter/test";
+import schema from "./schema";
 
-const t = convexTest(schema, modules);
+const t = convexTest(schema, import.meta.glob("./**/*.ts"));
 register(t, "apiKeys");
 shardedCounterTest.register(t, "apiKeys/shardedCounter");
 ```
