@@ -8,7 +8,9 @@ import {
   parseKeyString,
   timingSafeEqual,
   sha256Hex,
+  validateTag,
   validateTags,
+  validateNonEmpty,
   validateKeyPrefix,
   validateEnv,
   validateSizeLimits,
@@ -48,11 +50,17 @@ export const create = mutation({
     key: v.string(),
   }),
   handler: async (ctx, args) => {
-    if (args.expiresAt !== undefined && args.expiresAt <= Date.now()) {
-      throw new Error("expiresAt must be in the future");
+    validateNonEmpty("ownerId", args.ownerId);
+    validateNonEmpty("name", args.name);
+    // NaN and Infinity never compare as expired, so reject them explicitly.
+    if (
+      args.expiresAt !== undefined &&
+      !(Number.isFinite(args.expiresAt) && args.expiresAt > Date.now())
+    ) {
+      throw new Error("expiresAt must be in the future (finite timestamp)");
     }
-    if (args.remaining !== undefined && args.remaining <= 0) {
-      throw new Error("remaining must be > 0");
+    if (args.remaining !== undefined && !(Number.isInteger(args.remaining) && args.remaining > 0)) {
+      throw new Error("remaining must be > 0 (finite integer)");
     }
     if (args.tags) {
       validateTags(args.tags);
@@ -266,6 +274,7 @@ export const revokeByTag = mutation({
   },
   returns: v.object({ revokedCount: v.number() }),
   handler: async (ctx, { ownerId, tag }) => {
+    validateTag(tag);
     const activeKeys = await ctx.db
       .query("apiKeys")
       .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId).eq("status", "active"))
@@ -331,7 +340,8 @@ export const rotate = mutation({
     }
 
     const gracePeriodMs = args.gracePeriodMs ?? 3600000;
-    if (gracePeriodMs < MIN_GRACE_PERIOD_MS || gracePeriodMs > MAX_GRACE_PERIOD_MS) {
+    // Written so NaN fails the range check instead of slipping past it.
+    if (!(gracePeriodMs >= MIN_GRACE_PERIOD_MS && gracePeriodMs <= MAX_GRACE_PERIOD_MS)) {
       throw new Error(
         `gracePeriodMs must be between ${MIN_GRACE_PERIOD_MS} (60s) and ${MAX_GRACE_PERIOD_MS} (30 days)`,
       );
@@ -401,6 +411,9 @@ export const update = mutation({
     }
     if (TERMINAL_STATUSES.has(key.status as KeyStatus)) {
       throw new Error("cannot update terminal key");
+    }
+    if (updates.name !== undefined) {
+      validateNonEmpty("name", updates.name);
     }
     if (updates.tags) {
       validateTags(updates.tags);
@@ -481,11 +494,11 @@ export const configure = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (args.cleanupIntervalMs !== undefined && args.cleanupIntervalMs <= 0) {
-      throw new Error("cleanupIntervalMs must be > 0");
+    if (args.cleanupIntervalMs !== undefined && !(Number.isFinite(args.cleanupIntervalMs) && args.cleanupIntervalMs > 0)) {
+      throw new Error("cleanupIntervalMs must be > 0 (finite number)");
     }
-    if (args.defaultExpiryMs !== undefined && args.defaultExpiryMs <= 0) {
-      throw new Error("defaultExpiryMs must be > 0");
+    if (args.defaultExpiryMs !== undefined && !(Number.isFinite(args.defaultExpiryMs) && args.defaultExpiryMs > 0)) {
+      throw new Error("defaultExpiryMs must be > 0 (finite number)");
     }
 
     const existing = await ctx.db.query("config").first();

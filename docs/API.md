@@ -1,7 +1,7 @@
 # API Reference — @vllnt/convex-api-keys
 
-**Compatibility:** current `main` / `canary` requires `convex@^1.45.0`. Stable
-`0.2.0` requires `convex@^1.36.1`.
+**Compatibility:** requires `convex@^1.45.0` (releases before `0.3.0` required
+`convex@^1.36.1`).
 
 ## ApiKeys Class
 
@@ -111,15 +111,18 @@ be > 0.
 | ------------------- | ------------------------------------------------------------ |
 | `keyPrefix`         | `^[a-zA-Z0-9]+$` (no underscores)                            |
 | `env`               | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing) |
-| `name`              | max 256 characters                                           |
+| `ownerId`           | must not be empty (`ownerId must not be empty`)              |
+| `name`              | must not be empty, max 256 characters                        |
 | `metadata`          | max 4KB (JSON serialized)                                    |
 | `scopes`            | max 50 entries                                               |
 | `tags`              | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$`   |
-| `gracePeriodMs`     | min 60,000 (60s), max 2,592,000,000 (30 days)                |
-| `remaining`         | must be > 0                                                  |
-| `expiresAt`         | must be in the future                                        |
-| `cleanupIntervalMs` | must be > 0                                                  |
-| `defaultExpiryMs`   | must be > 0                                                  |
+| `gracePeriodMs`     | min 60,000 (60s), max 2,592,000,000 (30 days); NaN rejected  |
+| `tag` (revokeByTag) | same pattern as `tags`; empty is rejected (`Invalid tag`)    |
+| `remaining`         | finite integer > 0                                           |
+| `expiresAt`         | finite timestamp in the future (NaN/Infinity rejected)       |
+| `limit` (queries)   | positive integer (`limit must be a positive integer`)        |
+| `cleanupIntervalMs` | finite number > 0                                            |
+| `defaultExpiryMs`   | finite number > 0                                            |
 
 ## Key Format
 
