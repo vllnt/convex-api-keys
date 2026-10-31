@@ -1,13 +1,14 @@
 {
   "name": "@vllnt/convex-api-keys",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Convex component for secure API key management — create, validate, revoke, rotate, and track usage",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.8",
   "files": [
     "dist",
-    "src"
+    "src",
+    "!src/**/*.test.ts"
   ],
   "exports": {
     "./package.json": "./package.json",
