@@ -80,6 +80,18 @@ export function validateSizeLimits(args: {
 }
 
 
+export function validateNonEmpty(field: string, value: string): void {
+  if (value.length === 0) {
+    throw new Error(`${field} must not be empty`);
+  }
+}
+
+export function validateLimit(limit: number | undefined): void {
+  if (limit !== undefined && !(Number.isInteger(limit) && limit > 0)) {
+    throw new Error("limit must be a positive integer");
+  }
+}
+
 export function validateTag(tag: string): void {
   if (!TAG_PATTERN.test(tag)) {
     throw new Error(

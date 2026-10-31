@@ -2,8 +2,9 @@ import { v } from "convex/values";
 import { query } from "./_generated/server.js";
 import { components } from "./_generated/api.js";
 import { ShardedCounter } from "@convex-dev/sharded-counter";
-import { KEY_STATUS, KEY_TYPE } from "../shared.js";
+import { KEY_STATUS, KEY_TYPE, validateLimit } from "../shared.js";
 import { jsonValue } from "./validators.js";
+import type { Doc } from "./_generated/dataModel.js";
 
 const counter = new ShardedCounter(components.shardedCounter);
 
@@ -25,7 +26,7 @@ const keyItemValidator = v.object({
   lastUsedAt: v.optional(v.number()),
 });
 
-function mapKey(k: any) {
+function mapKey(k: Doc<"apiKeys">) {
   return {
     keyId: k._id,
     name: k.name,
@@ -52,6 +53,7 @@ export const list = query({
   },
   returns: v.array(keyItemValidator),
   handler: async (ctx, { ownerId, env, status, limit }) => {
+    validateLimit(limit);
     const pageSize = limit ?? DEFAULT_PAGE_SIZE;
     let keysQuery;
     if (env) {
@@ -86,6 +88,7 @@ export const listByTag = query({
   },
   returns: v.array(keyItemValidator),
   handler: async (ctx, { ownerId, tag, limit }) => {
+    validateLimit(limit);
     const pageSize = limit ?? DEFAULT_PAGE_SIZE;
     const allKeys = await ctx.db
       .query("apiKeys")
