@@ -15,6 +15,9 @@ importers:
       '@convex-dev/sharded-counter':
         specifier: ^0.2.3
         version: 0.2.3(convex@1.48.0)
+      '@vllnt/logger':
+        specifier: ^0.1.2
+        version: 0.1.2
     devDependencies:
       '@edge-runtime/vm':
         specifier: ^5.0.0
@@ -808,6 +811,9 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  '@vllnt/logger@0.1.2':
+    resolution: {integrity: sha512-xHSQgoArRKtFODnpEgjVyKRNXiCRTCiGDHK2kdMJ6/6+VGv9KXwzP265KC8RcXAL79/sLXVXdFoWXe3xACYOFw==}
 
   '@vllnt/typescript@2.0.0':
     resolution: {integrity: sha512-k+pUDoqBzTbGz8n0a0HwwrUb6khgpjBN+syhdtwQjkxy5Id6wrux3g4nrnWOCs/TyyPH1wiK8YzfpfHAFUpEXQ==}
@@ -3006,6 +3012,8 @@ snapshots:
       - eslint-import-resolver-webpack
       - supports-color
       - turbo
+
+  '@vllnt/logger@0.1.2': {}
 
   '@vllnt/typescript@2.0.0(@typescript/typescript6@6.0.2)':
     dependencies:
