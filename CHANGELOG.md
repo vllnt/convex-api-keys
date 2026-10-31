@@ -2,6 +2,12 @@
 
 ## [0.3.0] - Unreleased
 
+### Changed
+
+- Log with `@vllnt/logger` instead of the bundled logger. Log lines are now one
+  JSON string per call (`event` is `api-keys.<name>`, plus `level` and
+  `timestamp`) written with `console.info`, not `console.log("[api-keys]", name, data)`.
+
 ### Fixed
 
 - Reject `NaN` and `Infinity` for `expiresAt`, and `NaN`, `Infinity`, fractional
