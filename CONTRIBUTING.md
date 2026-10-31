@@ -40,15 +40,13 @@ pnpm test:watch    # watch mode
 
 ## Releases
 
-Maintainers only:
+Maintainers only. Every publish runs in `.github/workflows/publish.yml` with npm trusted
+publishing and provenance; nothing is published from a local machine.
 
-- Preferred: use `.github/workflows/publish.yml` with `workflow_dispatch` for patch/minor/major releases.
-- Local scripts remain available for patch and alpha publishes:
-
-```bash
-pnpm release       # patch bump + publish
-pnpm alpha         # prerelease (alpha tag)
-```
+- Canary (`@canary`): pushes to `main` publish one when the `CANARY_ENABLED` repository
+  variable is `true`; otherwise run the workflow manually on `main`.
+- Stable (`@latest`): merge a PR that sets `package.json` `version` and adds a matching
+  `## [X.Y.Z]` entry to `CHANGELOG.md`, then push the tag `vX.Y.Z` on that `main` commit.
 
 ## Reporting Issues
 
