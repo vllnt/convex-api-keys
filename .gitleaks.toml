@@ -1,0 +1,10 @@
+title = "gitleaks"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "synthetic test fixtures"
+paths = [
+  '''example/convex/example.test.ts''',
+]
