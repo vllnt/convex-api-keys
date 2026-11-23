@@ -50,7 +50,8 @@
     "codegen": "pnpm convex codegen --component-dir ./src/component"
   },
   "dependencies": {
-    "@convex-dev/sharded-counter": "^0.2.3"
+    "@convex-dev/sharded-counter": "^0.2.3",
+    "@vllnt/logger": "^0.1.2"
   },
   "peerDependencies": {
     "convex": "^1.45.0"
