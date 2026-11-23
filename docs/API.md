@@ -111,10 +111,10 @@ be > 0.
 | ------------------- | ------------------------------------------------------------ |
 | `keyPrefix`         | `^[a-zA-Z0-9]+$` (no underscores)                            |
 | `env`               | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing) |
-| `ownerId`           | must not be empty, max 256 characters on `create`            |
+| `ownerId`           | must not be empty (`ownerId must not be empty`)              |
 | `name`              | must not be empty, max 256 characters                        |
 | `metadata`          | max 4KB (JSON serialized)                                    |
-| `scopes`            | max 50 entries, each max 256 characters                      |
+| `scopes`            | max 50 entries                                               |
 | `tags`              | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$`   |
 | `gracePeriodMs`     | min 60,000 (60s), max 2,592,000,000 (30 days); NaN rejected  |
 | `tag` (revokeByTag) | same pattern as `tags`; empty is rejected (`Invalid tag`)    |

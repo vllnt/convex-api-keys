@@ -15,7 +15,6 @@ import {
   validateEnv,
   validateSizeLimits,
   KEY_PREFIX_SEPARATOR,
-  MAX_STRING_LENGTH,
 } from "../shared.js";
 import { createLogger } from "../log.js";
 import { jsonValue } from "./validators.js";
@@ -53,9 +52,6 @@ export const create = mutation({
   handler: async (ctx, args) => {
     validateNonEmpty("ownerId", args.ownerId);
     validateNonEmpty("name", args.name);
-    if (args.ownerId.length > MAX_STRING_LENGTH) {
-      throw new Error(`ownerId must be <= ${MAX_STRING_LENGTH} characters`);
-    }
     // NaN and Infinity never compare as expired, so reject them explicitly.
     if (
       args.expiresAt !== undefined &&
