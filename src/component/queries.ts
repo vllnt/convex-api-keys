@@ -90,15 +90,18 @@ export const listByTag = query({
   handler: async (ctx, { ownerId, tag, limit }) => {
     validateLimit(limit);
     const pageSize = limit ?? DEFAULT_PAGE_SIZE;
-    const allKeys = await ctx.db
+    const matches: Doc<"apiKeys">[] = [];
+    for await (const key of ctx.db
       .query("apiKeys")
-      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId))
-      .collect();
-
-    return allKeys
-      .filter((k) => k.tags.includes(tag))
-      .slice(0, pageSize)
-      .map(mapKey);
+      .withIndex("by_owner_status", (q) => q.eq("ownerId", ownerId))) {
+      if (key.tags.includes(tag)) {
+        matches.push(key);
+        if (matches.length >= pageSize) {
+          break;
+        }
+      }
+    }
+    return matches.map(mapKey);
   },
 });
 

@@ -128,3 +128,40 @@ describe("rejects empty identifiers", () => {
     );
   });
 });
+
+describe("listByTag early stop", () => {
+  test("returns the first matches in index order and stops at the limit", async () => {
+    const t = convexTest(schema, modules);
+    const ids: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      const created = await t.mutation(api.mutations.create, {
+        name: `k${String(i)}`,
+        ownerId: "owner",
+        tags: i % 2 === 0 ? ["ci"] : ["other"],
+      });
+      ids.push(created.keyId);
+    }
+    await t.mutation(api.mutations.create, { name: "x", ownerId: "someone", tags: ["ci"] });
+    const firstTwo = await t.query(api.queries.listByTag, { ownerId: "owner", tag: "ci", limit: 2 });
+    expect(firstTwo.map((k) => k.keyId)).toEqual([ids[0], ids[2]]);
+    const all = await t.query(api.queries.listByTag, { ownerId: "owner", tag: "ci" });
+    expect(all.map((k) => k.keyId)).toEqual([ids[0], ids[2], ids[4]]);
+    expect(
+      await t.query(api.queries.listByTag, { ownerId: "owner", tag: "missing", limit: 1 }),
+    ).toEqual([]);
+  });
+
+
+  test("listByTag with a limit reads only up to the limit-th match", async () => {
+    const t = convexTest({ schema, modules, transactionLimits: { documentsRead: 3 } });
+    for (let i = 0; i < 6; i++) {
+      await t.mutation(api.mutations.create, {
+        name: `k${String(i)}`,
+        ownerId: "owner",
+        tags: i % 2 === 0 ? ["ci"] : ["other"],
+      });
+    }
+    const firstTwo = await t.query(api.queries.listByTag, { ownerId: "owner", tag: "ci", limit: 2 });
+    expect(firstTwo.map((k) => k.name)).toEqual(["k0", "k2"]);
+  });
+});

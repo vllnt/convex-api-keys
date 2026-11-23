@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- `listByTag` stops reading once it has `limit` matches instead of collecting every key the
+  owner ever had (including revoked and expired history) before filtering.
+
 ## [0.3.0] - Unreleased
 
 ### Fixed
