@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- BREAKING: `create` rejects an `ownerId` over 256 characters, and `create` / `update` reject any
+  scope over 256 characters, bounding key document size.
+
 ## [0.3.0] - Unreleased
 
 ### Fixed

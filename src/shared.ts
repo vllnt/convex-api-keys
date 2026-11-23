@@ -71,6 +71,9 @@ export function validateSizeLimits(args: {
   if (args.scopes && args.scopes.length > MAX_SCOPES) {
     throw new Error(`scopes must have <= ${MAX_SCOPES} entries (got ${args.scopes.length})`);
   }
+  if (args.scopes?.some((scope) => scope.length > MAX_STRING_LENGTH)) {
+    throw new Error(`each scope must be <= ${MAX_STRING_LENGTH} characters`);
+  }
   if (args.tags && args.tags.length > MAX_TAGS) {
     throw new Error(`tags must have <= ${MAX_TAGS} entries (got ${args.tags.length})`);
   }
