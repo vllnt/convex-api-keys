@@ -151,4 +151,17 @@ describe("listByTag early stop", () => {
     ).toEqual([]);
   });
 
+
+  test("listByTag with a limit reads only up to the limit-th match", async () => {
+    const t = convexTest({ schema, modules, transactionLimits: { documentsRead: 3 } });
+    for (let i = 0; i < 6; i++) {
+      await t.mutation(api.mutations.create, {
+        name: `k${String(i)}`,
+        ownerId: "owner",
+        tags: i % 2 === 0 ? ["ci"] : ["other"],
+      });
+    }
+    const firstTwo = await t.query(api.queries.listByTag, { ownerId: "owner", tag: "ci", limit: 2 });
+    expect(firstTwo.map((k) => k.name)).toEqual(["k0", "k2"]);
+  });
 });
