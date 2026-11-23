@@ -128,3 +128,27 @@ describe("rejects empty identifiers", () => {
     );
   });
 });
+
+describe("input caps", () => {
+  test("create rejects an oversized ownerId and oversized scopes", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(api.mutations.create, { name: "k", ownerId: "o".repeat(257) }),
+    ).rejects.toThrow(/ownerId must be <= 256 characters/);
+    await expect(
+      t.mutation(api.mutations.create, { name: "k", ownerId: "o", scopes: ["s".repeat(257)] }),
+    ).rejects.toThrow(/each scope must be <= 256 characters/);
+    const created = await t.mutation(api.mutations.create, {
+      name: "k",
+      ownerId: "o".repeat(256),
+      scopes: ["s".repeat(256)],
+    });
+    await expect(
+      t.mutation(api.mutations.update, {
+        keyId: created.keyId,
+        ownerId: "o".repeat(256),
+        scopes: ["s".repeat(257)],
+      }),
+    ).rejects.toThrow(/each scope must be <= 256 characters/);
+  });
+});
