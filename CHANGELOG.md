@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- `listByTag` stops reading once it has `limit` matches instead of collecting every key the
+  owner ever had (including revoked and expired history) before filtering.
+
+### Fixed
+
+- `create` rejects an `ownerId` over 256 characters, and `create` / `update` reject any scope
+  over 256 characters, bounding key document size.
+
 ## [0.3.0] - Unreleased
 
 ### Fixed

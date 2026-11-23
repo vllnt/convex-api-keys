@@ -128,3 +128,48 @@ describe("rejects empty identifiers", () => {
     );
   });
 });
+
+describe("listByTag early stop and input caps", () => {
+  test("returns the first matches in index order and stops at the limit", async () => {
+    const t = convexTest(schema, modules);
+    const ids: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      const created = await t.mutation(api.mutations.create, {
+        name: `k${String(i)}`,
+        ownerId: "owner",
+        tags: i % 2 === 0 ? ["ci"] : ["other"],
+      });
+      ids.push(created.keyId);
+    }
+    await t.mutation(api.mutations.create, { name: "x", ownerId: "someone", tags: ["ci"] });
+    const firstTwo = await t.query(api.queries.listByTag, { ownerId: "owner", tag: "ci", limit: 2 });
+    expect(firstTwo.map((k) => k.keyId)).toEqual([ids[0], ids[2]]);
+    const all = await t.query(api.queries.listByTag, { ownerId: "owner", tag: "ci" });
+    expect(all.map((k) => k.keyId)).toEqual([ids[0], ids[2], ids[4]]);
+    expect(
+      await t.query(api.queries.listByTag, { ownerId: "owner", tag: "missing", limit: 1 }),
+    ).toEqual([]);
+  });
+
+  test("create rejects an oversized ownerId and oversized scopes", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.mutation(api.mutations.create, { name: "k", ownerId: "o".repeat(257) }),
+    ).rejects.toThrow(/ownerId must be <= 256 characters/);
+    await expect(
+      t.mutation(api.mutations.create, { name: "k", ownerId: "o", scopes: ["s".repeat(257)] }),
+    ).rejects.toThrow(/each scope must be <= 256 characters/);
+    const created = await t.mutation(api.mutations.create, {
+      name: "k",
+      ownerId: "o".repeat(256),
+      scopes: ["s".repeat(256)],
+    });
+    await expect(
+      t.mutation(api.mutations.update, {
+        keyId: created.keyId,
+        ownerId: "o".repeat(256),
+        scopes: ["s".repeat(257)],
+      }),
+    ).rejects.toThrow(/each scope must be <= 256 characters/);
+  });
+});
