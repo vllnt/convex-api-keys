@@ -4,6 +4,7 @@ import { components } from "./_generated/api.js";
 import { ShardedCounter } from "@convex-dev/sharded-counter";
 import { KEY_STATUS, KEY_TYPE, validateLimit } from "../shared.js";
 import { jsonValue } from "./validators.js";
+import { findKey } from "./lookup.js";
 import type { Doc } from "./_generated/dataModel.js";
 
 const counter = new ShardedCounter(components.shardedCounter);
@@ -43,6 +44,26 @@ function mapKey(k: Doc<"apiKeys">) {
     lastUsedAt: k.lastUsedAt,
   };
 }
+
+/**
+ * Read-only lookup of a key's stored status: the status of the key whose hash
+ * matches `key`, or null when the string is malformed or matches no key. Lets
+ * a caller refuse unknown, revoked, disabled, expired or exhausted keys
+ * without running the `validate` mutation (no write, no usage count).
+ *
+ * The stored status is not re-evaluated: a key past `expiresAt`, or a
+ * rotating key past its grace window, reads as `active` / `rotating` until
+ * `validate` marks it expired. Treat `active` and `rotating` as "maybe valid"
+ * and call `validate` before trusting the key.
+ */
+export const matchStatus = query({
+  args: { key: v.string() },
+  returns: v.union(KEY_STATUS, v.null()),
+  handler: async (ctx, { key }) => {
+    const lookup = await findKey(ctx.db, key);
+    return lookup.found ? lookup.key.status : null;
+  },
+});
 
 export const list = query({
   args: {

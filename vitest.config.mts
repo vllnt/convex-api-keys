@@ -21,6 +21,7 @@ export default defineConfig({
         "src/log.ts",
         "src/test.ts",
         "src/client/index.ts",
+        "src/component/lookup.ts",
         "src/component/mutations.ts",
         "src/component/queries.ts",
         "src/component/validators.ts",

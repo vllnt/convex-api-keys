@@ -190,5 +190,18 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         }>,
         Name
       >;
+      matchStatus: FunctionReference<
+        "query",
+        "internal",
+        { key: string },
+        | "active"
+        | "disabled"
+        | "revoked"
+        | "rotating"
+        | "expired"
+        | "exhausted"
+        | null,
+        Name
+      >;
     };
   };

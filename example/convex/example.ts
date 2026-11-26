@@ -170,6 +170,14 @@ export const enableKey = mutation({
   },
 });
 
+export const matchStatus = query({
+  args: { key: v.string() },
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    return await apiKeys.matchStatus(ctx, args);
+  },
+});
+
 export const getUsage = query({
   args: {
     keyId: v.string(),

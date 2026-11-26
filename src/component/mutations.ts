@@ -5,8 +5,6 @@ import { ShardedCounter } from "@convex-dev/sharded-counter";
 import {
   KEY_TYPE,
   TERMINAL_STATUSES,
-  parseKeyString,
-  timingSafeEqual,
   sha256Hex,
   validateTag,
   validateTags,
@@ -18,6 +16,7 @@ import {
 } from "../shared.js";
 import { createLogger } from "../log.js";
 import { jsonValue } from "./validators.js";
+import { findKey } from "./lookup.js";
 import type { KeyStatus } from "../shared.js";
 
 const log = createLogger("api-keys");
@@ -127,36 +126,15 @@ export const validate = mutation({
     }),
   ),
   handler: async (ctx, { key }) => {
-    const parsed = parseKeyString(key);
-    if (!parsed.valid) {
-      log.info("key.validate_failed", { reason: "malformed" });
-      return { valid: false as const, reason: "malformed" };
+    const lookup = await findKey(ctx.db, key);
+    if (!lookup.found) {
+      log.info("key.validate_failed", {
+        reason: lookup.reason,
+        ...(lookup.lookupPrefix === undefined ? {} : { lookupPrefix: lookup.lookupPrefix }),
+      });
+      return { valid: false as const, reason: lookup.reason };
     }
-
-    const candidates = await ctx.db
-      .query("apiKeys")
-      .withIndex("by_lookup_prefix", (q) => q.eq("lookupPrefix", parsed.lookupPrefix))
-      .collect();
-
-    if (candidates.length === 0) {
-      log.info("key.validate_failed", { reason: "not_found", lookupPrefix: parsed.lookupPrefix });
-      return { valid: false as const, reason: "not_found" };
-    }
-
-    const keyHash = await sha256Hex(key);
-
-    let matchedKey = null;
-    for (const candidate of candidates) {
-      if (timingSafeEqual(candidate.hash, keyHash)) {
-        matchedKey = candidate;
-        break;
-      }
-    }
-
-    if (!matchedKey) {
-      log.info("key.validate_failed", { reason: "not_found", lookupPrefix: parsed.lookupPrefix });
-      return { valid: false as const, reason: "not_found" };
-    }
+    const matchedKey = lookup.key;
 
     const now = Date.now();
 

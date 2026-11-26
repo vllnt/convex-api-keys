@@ -94,6 +94,19 @@ Temporarily disable a key. Reversible via `enable()`. Requires `ownerId`.
 
 Re-enable a disabled key. Requires `ownerId`.
 
+### matchStatus(ctx, { key })
+
+Read-only lookup: the stored status of the key matching `key`
+(`"active" | "disabled" | "revoked" | "rotating" | "expired" | "exhausted"`),
+or `null` when `key` is malformed or matches no key. It writes nothing and does
+not count usage. The stored status is not re-evaluated, so a key past
+`expiresAt` (or a rotating key past its grace window) reads as `active` /
+`rotating` until `validate()` marks it expired: treat those two values as
+"maybe valid" and call `validate()` before trusting the key. Also available as
+the component query `components.apiKeys.queries.matchStatus`.
+
+**Returns:** `KeyStatus | null`
+
 ### getUsage(ctx, { keyId, ownerId })
 
 Get usage count for a key. Returns O(1) counter value.

@@ -33,7 +33,8 @@ src/
 │   └── types.ts           # public TypeScript interfaces
 └── component/
     ├── mutations.ts        # all mutations (create, validate, revoke, revokeByTag, rotate, update, disable, enable, configure)
-    ├── queries.ts          # all queries (list, listByTag, getUsage)
+    ├── queries.ts          # all queries (matchStatus, list, listByTag, getUsage)
+    ├── lookup.ts           # findKey: shared key-string → row match for validate/matchStatus
     ├── validators.ts       # shared validators (jsonValue alias for v.any())
     ├── schema.ts           # sandboxed tables (apiKeys, config)
     └── convex.config.ts    # defineComponent("apiKeys"); child: @convex-dev/sharded-counter
