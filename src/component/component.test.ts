@@ -215,7 +215,7 @@ describe("matchStatus", () => {
 
   test("does not write or count usage", async () => {
     const { key, status, t } = await created({ remaining: 2 });
-    await status();
+    expect(await status()).toBe("active");
     const row = await t.run(async (ctx) => ctx.db.get(key.keyId));
     expect(row?.remaining).toBe(2);
     expect(row?.lastUsedAt).toBeUndefined();
