@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server.js";
 import { v } from "convex/values";
 import { ApiKeys } from "../../src/client/index.js";
+import { KEY_STATUS } from "../../src/shared.js";
 import { components } from "./_generated/api.js";
 
 const apiKeys = new ApiKeys(components.apiKeys, {
@@ -167,6 +168,14 @@ export const enableKey = mutation({
   handler: async (ctx, { keyId, ownerId }) => {
     await apiKeys.enable(ctx, { keyId, ownerId });
     return null;
+  },
+});
+
+export const matchStatus = query({
+  args: { key: v.string() },
+  returns: v.union(KEY_STATUS, v.null()),
+  handler: async (ctx, args) => {
+    return await apiKeys.matchStatus(ctx, args);
   },
 });
 

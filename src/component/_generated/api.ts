@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as lookup from "../lookup.js";
 import type * as mutations from "../mutations.js";
 import type * as queries from "../queries.js";
 import type * as validators from "../validators.js";
@@ -20,6 +21,7 @@ import type {
 import { anyApi, componentsGeneric } from "convex/server";
 
 const fullApi: ApiFromModules<{
+  lookup: typeof lookup;
   mutations: typeof mutations;
   queries: typeof queries;
   validators: typeof validators;

@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { describe, expect, test } from "vitest";
 import { convexTest } from "convex-test";
+import shardedCounterTest from "@convex-dev/sharded-counter/test";
 import { api } from "./_generated/api.js";
 import schema from "./schema.js";
 
@@ -163,5 +164,64 @@ describe("listByTag early stop", () => {
     }
     const firstTwo = await t.query(api.queries.listByTag, { ownerId: "owner", tag: "ci", limit: 2 });
     expect(firstTwo.map((k) => k.name)).toEqual(["k0", "k2"]);
+  });
+});
+
+describe("matchStatus", () => {
+  async function created(args: { expiresAt?: number; remaining?: number } = {}) {
+    const t = convexTest(schema, modules);
+    shardedCounterTest.register(t, "shardedCounter");
+    const key = await t.mutation(api.mutations.create, { name: "k", ownerId: "owner", ...args });
+    const status = () => t.query(api.queries.matchStatus, { key: key.key });
+    return { key, status, t };
+  }
+
+  test("returns the stored status of the matching key", async () => {
+    const { key, status, t } = await created();
+    expect(await status()).toBe("active");
+    await t.mutation(api.mutations.disable, { keyId: key.keyId, ownerId: "owner" });
+    expect(await status()).toBe("disabled");
+    await t.mutation(api.mutations.revoke, { keyId: key.keyId, ownerId: "owner" });
+    expect(await status()).toBe("revoked");
+  });
+
+  test("returns null for malformed, unknown and wrong-secret keys", async () => {
+    const { key, t } = await created();
+    const wrongSecret = `${key.key.slice(0, -1)}${key.key.endsWith("0") ? "1" : "0"}`;
+    const otherPrefix = key.key.replace(/_([0-9a-f]{8})_/u, "_00000000_");
+    for (const candidate of ["not-a-key", wrongSecret, otherPrefix]) {
+      expect(await t.query(api.queries.matchStatus, { key: candidate })).toBeNull();
+    }
+  });
+
+  test("reports exhausted, expired and rotating keys", async () => {
+    const limited = await created({ remaining: 1 });
+    await limited.t.mutation(api.mutations.validate, { key: limited.key.key });
+    expect(await limited.status()).toBe("exhausted");
+
+    const expiring = await created({ expiresAt: Date.now() + 60_000 });
+    await expiring.t.run(async (ctx) => {
+      await ctx.db.patch(expiring.key.keyId, { expiresAt: Date.now() - 1 });
+    });
+    // The stored status is not re-evaluated until `validate` marks the key.
+    expect(await expiring.status()).toBe("active");
+    await expiring.t.mutation(api.mutations.validate, { key: expiring.key.key });
+    expect(await expiring.status()).toBe("expired");
+
+    const rotated = await created();
+    await rotated.t.mutation(api.mutations.rotate, { keyId: rotated.key.keyId, ownerId: "owner" });
+    expect(await rotated.status()).toBe("rotating");
+  });
+
+  test("does not write or count usage", async () => {
+    const { key, status, t } = await created({ remaining: 2 });
+    expect(await status()).toBe("active");
+    const row = await t.run(async (ctx) => ctx.db.get(key.keyId));
+    expect(row?.remaining).toBe(2);
+    expect(row?.lastUsedAt).toBeUndefined();
+    expect(await t.query(api.queries.getUsage, { keyId: key.keyId, ownerId: "owner" })).toEqual({
+      remaining: 2,
+      total: 0,
+    });
   });
 });

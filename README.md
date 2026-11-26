@@ -33,6 +33,8 @@ const result = await apiKeys.validate(ctx, { key: bearerToken });
 - **Finite-use keys** — `remaining` counter with atomic decrement for
   one-time-use tokens.
 - **Disable / enable** — reversible pause without revoking.
+- **Read-only status check** — `matchStatus` reports a key's stored status (or
+  `null`) without the `validate` write, for refusing dead keys cheaply.
 - **Rotation** — configurable grace period (60s–30d) where both old and new keys
   are valid.
 - **Bulk revoke by tag, tags & environments, multi-tenant scoping, usage
@@ -140,6 +142,7 @@ lifecycle.
 | `configure(ctx, { ... })`                         | mutation | Runtime config (admin-only)            |
 | `list(ctx, { ownerId, env?, status?, limit? })`   | query    | Bounded array (default 100; no cursor) |
 | `listByTag(ctx, { ownerId, tag, limit? })`        | query    | Filter by tag                          |
+| `matchStatus(ctx, { key })`                       | query    | Stored status or null; no usage write  |
 | `getUsage(ctx, { keyId, ownerId })`               | query    | Usage counter (O(1))                   |
 
 `list` and `listByTag` return bounded arrays, not cursor-based pages; repeated

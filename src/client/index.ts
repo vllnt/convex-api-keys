@@ -153,6 +153,15 @@ export class ApiKeys {
     });
   }
 
+  /**
+   * Stored status of the key matching `key`, or null for a malformed or
+   * unknown key. Read-only: no usage count, no expiry update. `active` and
+   * `rotating` still need `validate()` before the key is trusted.
+   */
+  async matchStatus(ctx: RunQueryCtx, args: { key: string }): Promise<KeyStatus | null> {
+    return await ctx.runQuery(this.component.queries.matchStatus, { key: args.key });
+  }
+
   async getUsage(
     ctx: RunQueryCtx,
     args: { keyId: string; ownerId: string },

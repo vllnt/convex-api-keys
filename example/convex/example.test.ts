@@ -809,6 +809,19 @@ describe("listByTag", () => {
   });
 });
 
+// ─── matchStatus ─────────────────────────────────────────────────
+
+describe("matchStatus", () => {
+  test("reads the stored status through the client without counting usage", async () => {
+    const t = setup();
+    const created = await t.mutation(api.example.createKey, { name: "Status", ownerId: "org_1" });
+    expect(await t.query(api.example.matchStatus, { key: created.key })).toBe("active");
+    expect(await t.query(api.example.matchStatus, { key: "nope" })).toBeNull();
+    const usage = await t.query(api.example.getUsage, { keyId: created.keyId, ownerId: "org_1" });
+    expect(usage.total).toBe(0);
+  });
+});
+
 // ─── getUsage ────────────────────────────────────────────────────
 
 describe("getUsage", () => {

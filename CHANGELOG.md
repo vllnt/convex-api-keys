@@ -2,12 +2,15 @@
 
 ## [Unreleased]
 
-### Changed
+## [0.3.0] - 2026-11-26
 
-- `listByTag` stops reading once it has `limit` matches instead of collecting every key the
-  owner ever had (including revoked and expired history) before filtering.
+### Added
 
-## [0.3.0] - Unreleased
+- `matchStatus` query (component `queries.matchStatus` and client
+  `matchStatus(ctx, { key })`): the stored status of the key matching a key
+  string, or `null` for a malformed or unknown key. Read-only, so a caller can
+  refuse revoked, disabled, expired or exhausted keys without running the
+  `validate` mutation. `validate` and `matchStatus` share one key lookup.
 
 ### Fixed
 
@@ -27,6 +30,8 @@
 
 ### Changed
 
+- `listByTag` stops reading once it has `limit` matches instead of collecting every key the
+  owner ever had (including revoked and expired history) before filtering.
 - **Peer range**: requires `convex@^1.45.0` (0.2.0 required `^1.36.1`).
 - **License**: relicensed from Apache-2.0 to MIT.
 - Enforce the documented 100% statement, branch, function, and line coverage
