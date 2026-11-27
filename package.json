@@ -8,8 +8,12 @@
   "files": [
     "dist",
     "src",
+    "docs/API.md",
+    "CHANGELOG.md",
+    "llms.txt",
     "!src/**/*.test.ts",
-    "!src/**/*.spec.*"],
+    "!src/**/*.spec.*"
+  ],
   "exports": {
     "./package.json": "./package.json",
     ".": {
@@ -41,9 +45,10 @@
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/typecheck.tsbuildinfo",
     "typecheck:ci": "tsc --noEmit --incremental --tsBuildInfoFile node_modules/.cache/tsc/typecheck-ci.tsbuildinfo --project tsconfig.ci.json",
     "lint": "pnpm check:agents && eslint --cache --cache-location node_modules/.cache/eslint/ .",
-    "test": "pnpm check:agents && vitest run --passWithNoTests",
+    "test": "pnpm check:agents && pnpm test:package && vitest run --passWithNoTests",
     "test:watch": "vitest --typecheck --clearScreen false",
-    "test:coverage": "vitest run --coverage --coverage.reporter=text",
+    "test:coverage": "pnpm test:package && vitest run --coverage --coverage.reporter=text",
+    "test:package": "node scripts/test-package.mjs",
     "generate:llms": "node scripts/generate-llms.mjs",
     "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm typecheck && pnpm generate:llms",
     "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",
@@ -69,7 +74,7 @@
     "vite": "^8.3.8",
     "vitest": "^5.1.0"
   },
-  "homepage": "https://github.com/vllnt/convex-api-keys#readme",
+  "homepage": "https://oss.vllnt.com/packages/convex-api-keys",
   "bugs": {
     "url": "https://github.com/vllnt/convex-api-keys/issues"
   },
@@ -94,10 +99,12 @@
   "sideEffects": false,
   "keywords": [
     "convex",
+    "convex-component",
     "api-keys",
+    "api-key-management",
+    "key-rotation",
     "authentication",
-    "multi-tenant",
-    "convex-component"
+    "multi-tenant"
   ],
   "pnpm": {
     "minimumReleaseAge": 10080,

@@ -3,6 +3,18 @@
 **Compatibility:** requires `convex@^1.45.0` (releases before `0.3.0` required
 `convex@^1.36.1`).
 
+## Package exports
+
+| Import path                                   | Exports                                                                                                                                                                                                                            |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@vllnt/convex-api-keys`                      | `ApiKeys` class; types `ApiKeysConfig`, `CreateKeyOptions`, `CreateKeyResult`, `ValidationResult`, `ValidationFailureReason`, `KeyMetadata`, `UsageStats`, `RotateResult`, `KeyType`, `KeyStatus`, `RunMutationCtx`, `RunQueryCtx` |
+| `@vllnt/convex-api-keys/convex.config`        | default: the component definition, passed to `app.use()`                                                                                                                                                                           |
+| `@vllnt/convex-api-keys/test`                 | `register(t, name = "apiKeys")` to mount the component in `convex-test` (TypeScript source; needs Vite's `import.meta.glob`)                                                                                                       |
+| `@vllnt/convex-api-keys/_generated/component` | type `ComponentApi` (the type of `components.apiKeys`)                                                                                                                                                                             |
+
+`RunMutationCtx` is any context with `runMutation` (mutation or action);
+`RunQueryCtx` is any context with `runQuery` (query, mutation or action).
+
 ## ApiKeys Class
 
 ```ts
@@ -76,6 +88,9 @@ quota cannot be duplicated. Secret material is generated server-side.
 Return a bounded array of keys for an owner (default limit 100), with no raw
 keys or hashes. There is no cursor or continuation token.
 
+**Returns:** `KeyMetadata[]` —
+`{ keyId, name, lookupPrefix, type, env, scopes, tags, status, metadata?, remaining?, expiresAt?, createdAt, lastUsedAt? }`
+
 ### listByTag(ctx, { ownerId, tag, limit? })
 
 Return a bounded array of keys matching a tag (default limit 100). There is no
@@ -115,8 +130,10 @@ Get usage count for a key. Returns O(1) counter value.
 
 ### configure(ctx, { cleanupIntervalMs?, defaultExpiryMs? })
 
-Set runtime configuration. Admin-only surface — no ownerId scoping. Values must
-be > 0.
+Store runtime configuration. Admin-only surface — no ownerId scoping. Values
+must be finite and > 0. In this version the values are only stored: no cleanup
+job runs and `create()` does not apply `defaultExpiryMs`; pass `expiresAt` to
+`create()` to set an expiry.
 
 ## Input Validation
 

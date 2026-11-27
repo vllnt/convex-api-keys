@@ -68,6 +68,13 @@ export default app;
 > plan tier). The component has none. Scope enforcement is yours too: `validate`
 > returns the key's `scopes`; check them before acting.
 
+## For coding agents
+
+The npm package bundles its docs at `node_modules/@vllnt/convex-api-keys/`:
+`docs/API.md`, `CHANGELOG.md`, `llms.txt` and the TypeScript source in `src/`.
+They match the installed version. Read them before writing code against this
+package.
+
 ## Usage
 
 Expose a host mutation that derives ownership from authenticated identity:
@@ -181,6 +188,19 @@ register(t, "apiKeys");
 shardedCounterTest.register(t, "apiKeys/shardedCounter");
 ```
 
+## Related packages
+
+- [`@vllnt/convex-tokens`](https://www.npmjs.com/package/@vllnt/convex-tokens) —
+  short-lived, mint-once tokens with a TTL (invites, magic links, one-off
+  callbacks). Use convex-api-keys for long-lived keys with rotation, usage
+  counts and per-owner listing.
+- [`@vllnt/convex-permissions`](https://www.npmjs.com/package/@vllnt/convex-permissions)
+  — role-based access control. Use it to decide what a validated key's owner may
+  do; this package only returns the key's `scopes`.
+- [`@vllnt/convex-quota`](https://www.npmjs.com/package/@vllnt/convex-quota) —
+  allowances that reset on a schedule (per day, week, month). Use it for per-key
+  plan limits; `remaining` here is a one-off counter that never resets.
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR
@@ -191,11 +211,12 @@ guidelines.
 Built by [bntvllnt](https://github.com/bntvllnt) ·
 [bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
 
-Part of the [@vllnt](https://github.com/vllnt) Convex component fleet —
-[vllnt.com](https://vllnt.com)
-
 If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+Part of vllnt oss: https://oss.vllnt.com

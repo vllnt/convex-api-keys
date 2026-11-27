@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Added
+
+- The npm package now ships `docs/API.md`, `CHANGELOG.md` and `llms.txt`, so
+  coding agents can read docs that match the installed version from
+  `node_modules/@vllnt/convex-api-keys/`. `llms.txt` links shipped files by
+  relative path. `pnpm test:package` (run by `pnpm test` and
+  `pnpm test:coverage`) fails when one of them is missing from the tarball.
+- `docs/API.md` documents the package entry points and exported types.
+
+### Changed
+
+- Canary releases publish on every push to `main` that touches the package or
+  its shipped docs; a repository variable no longer gates them.
+- `homepage` points to https://oss.vllnt.com/packages/convex-api-keys.
+
 ## [0.3.0] - 2026-11-26
 
 ### Added
