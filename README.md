@@ -192,9 +192,9 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 ## Related packages
 
 - [`@vllnt/convex-tokens`](https://www.npmjs.com/package/@vllnt/convex-tokens) —
-  short-lived, mint-once tokens with a TTL (invites, magic links, one-off
-  callbacks). Use convex-api-keys for long-lived keys with rotation, usage
-  counts and per-owner listing.
+  short-lived tokens shown once, with a TTL that always expires and revoke (for
+  example invite or reset links). Use convex-api-keys for long-lived keys with
+  rotation, usage counts and per-owner listing.
 - [`@vllnt/convex-permissions`](https://www.npmjs.com/package/@vllnt/convex-permissions)
   — role-based access control. Use it to decide what a validated key's owner may
   do; this package only returns the key's `scopes`.
