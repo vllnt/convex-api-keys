@@ -12,6 +12,13 @@
   relative path. `pnpm test:package` (run by `pnpm test` and
   `pnpm test:coverage`) fails when one of them is missing from the tarball.
 - `docs/API.md` documents the package entry points and exported types.
+- Every public export and `ApiKeys` method has a TSDoc summary, shipped in the
+  `.d.ts` files; `ApiKeys` links its package page with `@see`.
+- `pnpm test:package` runs `scripts/check-docs.mjs`. It fails when a README
+  section is missing or out of order, a code block has no language, a relative
+  link or anchor breaks, an export or error message is undocumented, a README
+  TypeScript example does not type-check against the built package, or the
+  vllnt footer, `llms.txt` ecosystem block or package metadata drift.
 
 ### Changed
 
@@ -26,12 +33,22 @@
   its shipped docs; a repository variable no longer gates them.
 - `homepage` points to https://oss.vllnt.com/packages/convex-api-keys.
 - Update `@convex-dev/sharded-counter` to `^0.2.4`.
+- The README is organised for coding agents: When to use, Install, Quick
+  start, an API table of every export, Common tasks, an Errors and fixes table
+  of every message and `validate` reason, Limits and gotchas, and
+  Compatibility. `llms.txt` carries the same summary and links.
+- `package.json` `description` and `keywords` describe what the package does.
 
 ### Fixed
 
 - `package.json` `repository.url` uses the form npm expects, so publishing no
   longer prints an auto-correction warning. `pnpm test:package` fails when
   `npm pkg fix` would rewrite any field.
+- `RunMutationCtx` and `RunQueryCtx` accept action and HTTP action contexts.
+  They were `Pick`s of the mutation and query context types, which an action
+  `ctx` does not satisfy (checked with `convex` 1.45.0 and 1.51.0), so calling
+  `ApiKeys` methods from an action or HTTP action failed to type-check. They are now interfaces with only the
+  `runMutation` / `runQuery` call this package makes.
 
 ## [0.3.0] - 2026-11-26
 
