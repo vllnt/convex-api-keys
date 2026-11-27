@@ -1,4 +1,9 @@
-import type { FunctionReference, FunctionReturnType, OptionalRestArgs } from "convex/server";
+import type {
+  FunctionReference,
+  FunctionReturnType,
+  FunctionVisibility,
+  OptionalRestArgs,
+} from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
 import type {
   CreateKeyOptions,
@@ -26,7 +31,7 @@ export type {
 
 /** Any Convex context that can run a mutation: a mutation, action or HTTP action `ctx`. */
 export interface RunMutationCtx {
-  runMutation<Mutation extends FunctionReference<"mutation", "internal">>(
+  runMutation<Mutation extends FunctionReference<"mutation", FunctionVisibility>>(
     mutation: Mutation,
     ...args: OptionalRestArgs<Mutation>
   ): Promise<FunctionReturnType<Mutation>>;
@@ -34,7 +39,7 @@ export interface RunMutationCtx {
 
 /** Any Convex context that can run a query: a query, mutation, action or HTTP action `ctx`. */
 export interface RunQueryCtx {
-  runQuery<Query extends FunctionReference<"query", "internal">>(
+  runQuery<Query extends FunctionReference<"query", FunctionVisibility>>(
     query: Query,
     ...args: OptionalRestArgs<Query>
   ): Promise<FunctionReturnType<Query>>;
@@ -241,8 +246,8 @@ export class ApiKeys {
   }
 
   /**
-   * Store `cleanupIntervalMs` and `defaultExpiryMs`. Admin-only, not scoped by
-   * owner. The values are stored but not used yet.
+   * Store `cleanupIntervalMs` and `defaultExpiryMs`. Not scoped by owner, so
+   * gate it in your own code. The values are stored but not used yet.
    */
   async configure(
     ctx: RunMutationCtx,

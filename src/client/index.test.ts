@@ -1,4 +1,5 @@
 import type {
+  FunctionReference,
   GenericActionCtx,
   GenericDataModel,
   GenericMutationCtx,
@@ -23,4 +24,28 @@ test("RunQueryCtx accepts query, mutation and action contexts", () => {
   expectTypeOf<GenericQueryCtx<GenericDataModel>>().toExtend<RunQueryCtx>();
   expectTypeOf<GenericMutationCtx<GenericDataModel>>().toExtend<RunQueryCtx>();
   expectTypeOf<GenericActionCtx<GenericDataModel>>().toExtend<RunQueryCtx>();
+});
+
+test("RunMutationCtx and RunQueryCtx run public and internal references", () => {
+  type Ref<Type extends "mutation" | "query", Visibility extends "public" | "internal"> = FunctionReference<
+    Type,
+    Visibility,
+    Record<string, never>,
+    null
+  >;
+  const call = (
+    ctx: RunMutationCtx & RunQueryCtx,
+    refs: {
+      publicMutation: Ref<"mutation", "public">;
+      internalMutation: Ref<"mutation", "internal">;
+      publicQuery: Ref<"query", "public">;
+      internalQuery: Ref<"query", "internal">;
+    },
+  ) => [
+    ctx.runMutation(refs.publicMutation, {}),
+    ctx.runMutation(refs.internalMutation, {}),
+    ctx.runQuery(refs.publicQuery, {}),
+    ctx.runQuery(refs.internalQuery, {}),
+  ];
+  expectTypeOf(call).toBeFunction();
 });
