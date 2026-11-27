@@ -141,14 +141,14 @@ if (
 const NAME = pkg.name.replace(/^@[^/]+\//, "");
 if (pkg.homepage !== `https://oss.vllnt.com/packages/${NAME}`)
   fail(`package.json homepage must be https://oss.vllnt.com/packages/${NAME}`);
-if (
-  pkg.author?.url !== "https://bntvllnt.com" ||
-  !pkg.funding?.url ||
-  pkg.bugs?.url !== `https://github.com/vllnt/${NAME}/issues`
-) {
-  fail(
-    "package.json author.url, funding and bugs.url must match the vllnt package shape",
-  );
+const SHAPE = {
+  author: { name: "bntvllnt", url: "https://bntvllnt.com" },
+  funding: { type: "github", url: "https://github.com/sponsors/bntvllnt" },
+  bugs: { url: `https://github.com/vllnt/${NAME}/issues` },
+};
+for (const [field, value] of Object.entries(SHAPE)) {
+  if (JSON.stringify(pkg[field]) !== JSON.stringify(value))
+    fail(`package.json ${field} must be ${JSON.stringify(value)}`);
 }
 
 // ── Backlinks ────────────────────────────────────────────────────────────────
@@ -168,15 +168,21 @@ for (const file of ["README.md", "docs/API.md", "llms.txt", "CHANGELOG.md"]) {
   )) {
     if (label === pkg.name) continue;
     const other = label.slice("@vllnt/".length);
-    if (
-      url !== `https://oss.vllnt.com/packages/${other}` &&
-      url !== `https://www.npmjs.com/package/${label}`
-    ) {
+    if (url !== `https://oss.vllnt.com/packages/${other}`) {
       fail(
         `${file}: ${label} must link https://oss.vllnt.com/packages/${other}`,
       );
     }
   }
+}
+
+for (const line of section(README, "Related packages").split("\n")) {
+  if (!line.startsWith("- ")) continue;
+  const match = /^- \[`@vllnt\/([a-z0-9-]+)`\]\(([^)]+)\)/.exec(line);
+  if (!match || match[2] !== `https://oss.vllnt.com/packages/${match[1]}`)
+    fail(
+      `README "## Related packages" entries must start with [\`@vllnt/<name>\`](https://oss.vllnt.com/packages/<name>): ${line}`,
+    );
 }
 
 // ── Code blocks ──────────────────────────────────────────────────────────────
@@ -213,7 +219,11 @@ for (const block of blocks) {
     fail(
       `${block.file}:${block.line} code block needs a language tag (ts, bash or text), has "${block.lang}"`,
     );
-  if (block.lang === "ts" && /\.\.\.(?![\w$({[])/.test(block.code))
+  if (
+    block.lang === "ts" &&
+    (/\.\.\.(?![\w$({[])/.test(block.code) ||
+      /(\/\/|\/\*).*\.\.\./.test(block.code))
+  )
     fail(`${block.file}:${block.line} code block has a "..." gap`);
 }
 
@@ -363,14 +373,41 @@ function sourceFiles(dir) {
       (f) => f.endsWith(".ts") && !/\.test\.ts$/.test(f) && !GENERATED.test(f),
     );
 }
+const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const sources = sourceFiles("src").map((file) => ({
+  file,
+  source: ts.createSourceFile(file, read(file), ts.ScriptTarget.ES2022, true),
+}));
+const numbers = new Map();
+const calls = [];
+for (const { source } of sources) {
+  const scan = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+      const text = node.initializer.getText().replace(/_/g, "");
+      if (/^[\d\s*+\-/().]+$/.test(text)) numbers.set(node.name.text, Function(`return (${text})`)());
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) calls.push(node);
+    ts.forEachChild(node, scan);
+  };
+  scan(source);
+}
+function spanPatterns(span) {
+  const expr = span.expression;
+  if (ts.isIdentifier(expr) && numbers.has(expr.text)) return [escapeRe(String(numbers.get(expr.text)))];
+  let fn = span.parent;
+  while (fn && !ts.isFunctionDeclaration(fn)) fn = fn.parent;
+  const index = fn && ts.isIdentifier(expr) ? fn.parameters.findIndex((p) => p.name.getText() === expr.text) : -1;
+  if (index !== -1) {
+    const literals = calls
+      .filter((c) => c.expression.text === fn.name.text && c.arguments[index] && ts.isStringLiteral(c.arguments[index]))
+      .map((c) => escapeRe(c.arguments[index].text));
+    if (literals.length > 0) return [...new Set(literals)];
+  }
+  return ["<[a-z]+>"];
+}
 const thrown = [];
-for (const file of sourceFiles("src")) {
-  const source = ts.createSourceFile(
-    file,
-    read(file),
-    ts.ScriptTarget.ES2022,
-    true,
-  );
+for (const { file } of sources) {
+  const { source } = sources.find((s) => s.file === file);
   const visit = (node) => {
     if (
       ts.isThrowStatement(node) &&
@@ -384,15 +421,13 @@ for (const file of sourceFiles("src")) {
       )
         thrown.push({ file, text: arg.text, re: null });
       else if (arg && ts.isTemplateExpression(arg)) {
-        const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const pattern =
-          escape(arg.head.text) +
-          arg.templateSpans.map((s) => ".+" + escape(s.literal.text)).join("");
-        thrown.push({
-          file,
-          text: arg.getText(),
-          re: new RegExp(`^${pattern}$`),
-        });
+        let patterns = [escapeRe(arg.head.text)];
+        for (const span of arg.templateSpans) {
+          const options = spanPatterns(span);
+          patterns = patterns.flatMap((p) => options.map((o) => p + o + escapeRe(span.literal.text)));
+        }
+        for (const pattern of patterns)
+          thrown.push({ file, text: `/^${pattern}$/`, re: new RegExp(`^${pattern}$`) });
       } else
         fail(
           `${file}: thrown error without a literal message: ${node.getText().slice(0, 60)}`,
@@ -476,16 +511,20 @@ for (const diagnostic of ts.getPreEmitDiagnostics(examples)) {
   );
 }
 
-// ── Shipped files: no vllnt.ai, @see on the main entry ──────────────────────
+// ── Tracked and shipped files: no forbidden domain; @see on the main entry ──
+const FORBIDDEN_DOMAIN = ["vllnt", "ai"].join(".");
 const packed = JSON.parse(
   execFileSync("pnpm", ["pack", "--dry-run", "--json"], {
     cwd: ROOT,
     encoding: "utf8",
   }),
 ).files.map((f) => f.path);
-for (const file of packed) {
-  if (/vllnt\.ai/i.test(readFileSync(join(ROOT, file), "utf8")))
-    fail(`${file} mentions vllnt.ai; use the vllnt.com URL`);
+const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" }).split("\n").filter(Boolean);
+const forbidden = new RegExp(escapeRe(FORBIDDEN_DOMAIN), "i");
+for (const file of new Set([...packed, ...tracked])) {
+  if (!existsSync(join(ROOT, file))) continue;
+  if (forbidden.test(readFileSync(join(ROOT, file), "utf8")))
+    fail(`${file} mentions ${FORBIDDEN_DOMAIN}; use the vllnt.com URL`);
 }
 const SEE = `@see https://oss.vllnt.com/packages/${NAME}`;
 if (!read("dist/client/index.d.ts").includes(SEE))
