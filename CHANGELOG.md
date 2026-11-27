@@ -16,6 +16,7 @@
 - Canary releases publish on every push to `main` that touches the package or
   its shipped docs; a repository variable no longer gates them.
 - `homepage` points to https://oss.vllnt.com/packages/convex-api-keys.
+- Update `@convex-dev/sharded-counter` to `^0.2.4`.
 
 ## [0.3.0] - 2026-11-26
 

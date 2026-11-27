@@ -10,7 +10,10 @@
     "sourceMap": true,
     "outDir": "dist",
     "rootDir": "src",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // Convex validators type `v.optional(x)` as `prop?: T` but store and return
+    // `undefined` as a missing field; this flag rejects that pattern.
+    "exactOptionalPropertyTypes": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
