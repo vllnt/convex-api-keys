@@ -72,7 +72,8 @@ does nothing and does not throw. It checks the stored status: a key past
 ### revokeByTag(ctx, { ownerId, tag })
 
 Bulk revoke all keys matching a tag. Covers `active`, `rotating`, and `disabled`
-statuses.
+statuses. Like `revoke()`, it checks the stored status, so a key past its expiry
+that `validate()` has not marked `expired` yet is revoked.
 
 **Returns:** `{ revokedCount: number }`
 
