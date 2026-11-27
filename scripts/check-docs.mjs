@@ -121,7 +121,7 @@ if (!firstExample || firstExample > 40)
   );
 const badge =
   readmeLines.findIndex(
-    (l) => l.includes("img.shields.io") || l.includes("badge.svg"),
+    (l) => /!\[[^\]]*\]\((https:\/\/img\.shields\.io\/|[^)]*badge\.svg)/.test(l),
   ) + 1;
 const apiHeading = readmeHeadings.find((h) => h.text === "API");
 if (badge && apiHeading && badge < apiHeading.line)
@@ -232,7 +232,6 @@ const slug = (text) =>
   text
     .trim()
     .toLowerCase()
-    .replace(/<[^>]+>/g, "")
     .replace(/[^\p{L}\p{N} _-]/gu, "")
     .replace(/ /g, "-");
 const anchorCache = new Map();
@@ -381,11 +380,15 @@ const sources = sourceFiles("src").map((file) => ({
 const numbers = new Map();
 const calls = [];
 for (const { source } of sources) {
-  const scan = (node) => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-      const text = node.initializer.getText().replace(/_/g, "");
-      if (/^[\d\s*+\-/().]+$/.test(text)) numbers.set(node.name.text, Function(`return (${text})`)());
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Const)) continue;
+    for (const node of statement.declarationList.declarations) {
+      const text = node.initializer?.getText().replace(/_/g, "") ?? "";
+      if (ts.isIdentifier(node.name) && /^[\d\s*+\-/().]+$/.test(text))
+        numbers.set(node.name.text, Function(`return (${text})`)());
     }
+  }
+  const scan = (node) => {
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) calls.push(node);
     ts.forEachChild(node, scan);
   };
