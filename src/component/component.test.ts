@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import { convexTest } from "convex-test";
 import shardedCounterTest from "@convex-dev/sharded-counter/test";
 import { api } from "./_generated/api.js";
@@ -223,5 +223,43 @@ describe("matchStatus", () => {
       remaining: 2,
       total: 0,
     });
+  });
+});
+
+describe("revoke keeps a final status final", () => {
+  async function keyIn(status: "expired" | "exhausted") {
+    const t = convexTest(schema, modules);
+    shardedCounterTest.register(t, "shardedCounter");
+    const created = await t.mutation(api.mutations.create, {
+      name: status,
+      ownerId: "owner",
+      ...(status === "exhausted" ? { remaining: 1 } : { expiresAt: Date.now() + 1000 }),
+    });
+    if (status === "exhausted") {
+      await t.mutation(api.mutations.validate, { key: created.key });
+    } else {
+      vi.setSystemTime(Date.now() + 2000);
+    }
+    await t.mutation(api.mutations.validate, { key: created.key });
+    expect(await t.query(api.queries.matchStatus, { key: created.key })).toBe(status);
+    return { t, created };
+  }
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test.each(["expired", "exhausted"] as const)("revoke leaves an %s key unchanged and returns null", async (status) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const { t, created } = await keyIn(status);
+    const before = await t.run((ctx) => ctx.db.get(created.keyId));
+
+    const result = await t.mutation(api.mutations.revoke, { keyId: created.keyId, ownerId: "owner" });
+
+    expect(result).toBeNull();
+    const after = await t.run((ctx) => ctx.db.get(created.keyId));
+    expect(after).toEqual(before);
+    expect(after?.status).toBe(status);
+    expect(after?.revokedAt).toBeUndefined();
   });
 });

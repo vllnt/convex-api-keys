@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 // Fail when the npm tarball misses a file consumers and coding agents read from
 // node_modules, ships a contributor-only file, or llms.txt links a shipped file
@@ -44,6 +46,23 @@ for (const [, target] of readFileSync("llms.txt", "utf8").matchAll(/\]\(([^)\s]+
   if (/^[a-z]+:/i.test(target) || target.startsWith("#")) continue;
   const path = target.split("#")[0].replace(/^\.\//, "");
   if (!packed.has(path)) errors.push(`llms.txt: ${target} is not in the tarball`);
+}
+
+// npm publish rewrites package.json fields it considers malformed and warns
+// about it; `npm pkg fix` applies the same normalisation. Run it on a copy.
+const fixDir = mkdtempSync(join(tmpdir(), "pkg-fix-"));
+try {
+  copyFileSync("package.json", join(fixDir, "package.json"));
+  execFileSync("npm", ["pkg", "fix"], { cwd: fixDir, stdio: "ignore" });
+  const original = JSON.parse(readFileSync("package.json", "utf8"));
+  const fixed = JSON.parse(readFileSync(join(fixDir, "package.json"), "utf8"));
+  for (const key of new Set([...Object.keys(original), ...Object.keys(fixed)])) {
+    if (JSON.stringify(original[key]) !== JSON.stringify(fixed[key])) {
+      errors.push(`package.json: npm publish would rewrite "${key}" to ${JSON.stringify(fixed[key])}`);
+    }
+  }
+} finally {
+  rmSync(fixDir, { recursive: true, force: true });
 }
 
 if (errors.length > 0) {

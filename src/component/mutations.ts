@@ -236,7 +236,8 @@ export const revoke = mutation({
     if (key.ownerId !== ownerId) {
       throw new Error("unauthorized: key does not belong to owner");
     }
-    if (key.status === "revoked") {
+    // Revoked, expired and exhausted keys are final: revoking one changes nothing.
+    if (TERMINAL_STATUSES.has(key.status)) {
       return null;
     }
     await ctx.db.patch("apiKeys", keyId, { status: "revoked", revokedAt: Date.now() });

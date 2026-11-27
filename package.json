@@ -1,6 +1,6 @@
 {
   "name": "@vllnt/convex-api-keys",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Convex component for secure API key management — create, validate, revoke, rotate, and track usage",
   "license": "MIT",
   "type": "module",
@@ -88,7 +88,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/vllnt/convex-api-keys"
+    "url": "git+https://github.com/vllnt/convex-api-keys.git"
   },
   "engines": {
     "node": ">=18"
