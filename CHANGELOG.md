@@ -4,20 +4,6 @@
 
 ## [0.4.0] - 2026-11-27
 
-### Changed (behaviour)
-
-- **`revoke()` keeps a final status final**: on an `expired` or `exhausted` key
-  it now does nothing, as it already did for a `revoked` key. Before, it changed
-  the key's status to `revoked` and set `revokedAt`. It still returns without
-  error. If your app read `status === "revoked"` or `revokedAt` to mean "revoke
-  was called", also treat `expired` and `exhausted` as final.
-
-### Fixed
-
-- `package.json` `repository.url` uses the form npm expects, so publishing no
-  longer prints an auto-correction warning. `pnpm test:package` fails when
-  `npm pkg fix` would rewrite any field.
-
 ### Added
 
 - The npm package now ships `docs/API.md`, `CHANGELOG.md` and `llms.txt`, so
@@ -29,10 +15,23 @@
 
 ### Changed
 
+- **Behaviour change: `revoke()` keeps a final status final.** On a key whose
+  stored status is `expired` or `exhausted` it now does nothing, as it already
+  did for a `revoked` key: the status and `revokedAt` stay as they are and no
+  `key.revoked` log entry is written. Before, it changed the status to `revoked`
+  and set `revokedAt`. It still returns without error. If your app read
+  `status === "revoked"` or `revokedAt` to mean "revoke was called", also treat
+  `expired` and `exhausted` as final.
 - Canary releases publish on every push to `main` that touches the package or
   its shipped docs; a repository variable no longer gates them.
 - `homepage` points to https://oss.vllnt.com/packages/convex-api-keys.
 - Update `@convex-dev/sharded-counter` to `^0.2.4`.
+
+### Fixed
+
+- `package.json` `repository.url` uses the form npm expects, so publishing no
+  longer prints an auto-correction warning. `pnpm test:package` fails when
+  `npm pkg fix` would rewrite any field.
 
 ## [0.3.0] - 2026-11-26
 
