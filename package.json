@@ -1,7 +1,7 @@
 {
   "name": "@vllnt/convex-api-keys",
   "version": "0.4.0",
-  "description": "Convex component for secure API key management — create, validate, revoke, rotate, and track usage",
+  "description": "Convex component to create, validate, revoke and rotate API keys, stored as SHA-256 hashes, with owner scoping, scopes, expiry, use limits and usage counts.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.9",
@@ -48,7 +48,7 @@
     "test": "pnpm check:agents && pnpm test:package && vitest run --passWithNoTests",
     "test:watch": "vitest --typecheck --clearScreen false",
     "test:coverage": "pnpm test:package && vitest run --coverage --coverage.reporter=text",
-    "test:package": "node scripts/test-package.mjs",
+    "test:package": "node scripts/test-package.mjs && node scripts/check-docs.mjs",
     "generate:llms": "node scripts/generate-llms.mjs",
     "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm typecheck && pnpm generate:llms",
     "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",
@@ -102,9 +102,12 @@
     "convex-component",
     "api-keys",
     "api-key-management",
+    "api-key-validation",
     "key-rotation",
-    "authentication",
-    "multi-tenant"
+    "key-revocation",
+    "hashed-api-keys",
+    "multi-tenant",
+    "usage-limits"
   ],
   "pnpm": {
     "minimumReleaseAge": 10080,

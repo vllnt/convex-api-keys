@@ -1,6 +1,5 @@
 /**
  * Minimal structured logger. Convex-safe (no process.env, no Node APIs).
- * Replace with your own logger by wrapping this module.
  */
 export interface Logger {
   info(message: string, data?: Record<string, unknown>): void;
