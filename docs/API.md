@@ -61,9 +61,10 @@ or `{ valid: false, reason }`
 
 ### revoke(ctx, { keyId, ownerId })
 
-Permanently revoke a key. Requires `ownerId` for auth boundary. Any status
-except `revoked` becomes `revoked`, including `expired` and `exhausted`;
-revoking a key that is already revoked does nothing.
+Permanently revoke a key. Requires `ownerId` for auth boundary. An `active`,
+`disabled` or `rotating` key becomes `revoked`. A key that is already final
+(`revoked`, `expired` or `exhausted`) keeps its status and `revokedAt`; the call
+does nothing and does not throw.
 
 ### revokeByTag(ctx, { ownerId, tag })
 
@@ -147,6 +148,7 @@ Status rules:
 
 - `update()` throws `cannot update terminal key` for `revoked`, `expired` and
   `exhausted` keys.
+- `revoke()` on a `revoked`, `expired` or `exhausted` key does nothing.
 - `disable()` works on `active` keys only; disabling a `disabled` key does
   nothing.
 - `enable()` works on `disabled` keys only; enabling an `active` key does
