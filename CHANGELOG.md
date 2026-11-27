@@ -17,8 +17,9 @@
 - `pnpm test:package` runs `scripts/check-docs.mjs`. It fails when a README
   section is missing or out of order, a code block has no language, a relative
   link or anchor breaks, an export or error message is undocumented, a README
-  TypeScript example does not type-check against the built package, or the
-  vllnt footer, `llms.txt` ecosystem block or package metadata drift.
+  or `docs/API.md` TypeScript example does not type-check against the built
+  package, or the vllnt footer, `llms.txt` ecosystem block or package metadata
+  drift.
 
 ### Changed
 
@@ -45,9 +46,16 @@
 - README Related packages lists only packages this one uses in code; it is now
   "None.".
 - The `llms.txt` Ecosystem block links the release feed and package search.
-- `scripts/check-docs.mjs` enforces the intro sentence, the Links section and
-  its place before License, the Related packages rule and the new Ecosystem
-  block.
+- `scripts/check-docs.mjs` also fails when the `package.json` description is
+  not one sentence naming Convex, or is not both the first line after the
+  README title and the first line after the `llms.txt` title (as `> `); when
+  the README Links section differs from the standard list, is not directly
+  before License, or License is not the last section; when Related packages
+  does not list exactly the `@vllnt` packages in `dependencies`,
+  `peerDependencies` or imports in `src/` and `example/` (one "None." line when
+  there are none); when `llms.txt` does not end with the Ecosystem block; and
+  when a `docs/API.md` TypeScript example does not type-check. CHANGELOG and
+  TSDoc examples are not type-checked.
 
 ### Fixed
 

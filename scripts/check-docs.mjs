@@ -8,9 +8,10 @@ import ts from "typescript";
 // command or first example moves below line 40, a code block has no language
 // or a `...` gap, a relative link or anchor breaks, a public export lacks TSDoc
 // or a README/API entry, an error message is missing from "Errors and fixes",
-// or a README TypeScript example stops type-checking against the built package.
-// It also pins the README intro and llms.txt summary to the package.json
-// description, and the README Links section, footer and llms.txt Ecosystem block.
+// or a README or docs/API.md TypeScript example stops type-checking against the
+// built package. It also pins the README intro and llms.txt summary to the
+// package.json description, the README Links section, footer and Related
+// packages list, and the llms.txt Ecosystem block.
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), "..");
 const read = (file) => readFileSync(join(ROOT, file), "utf8");
@@ -79,6 +80,8 @@ for (const name of AFTER) {
 }
 if (h2[h2.indexOf("License") - 1] !== "Links")
   fail('README "## Links" must come directly before "## License"');
+if (h2[h2.length - 1] !== "License")
+  fail('README "## License" must be the last "##" section, directly above the footer');
 
 function section(markdown, name) {
   const lines = markdown.split("\n");
@@ -133,9 +136,15 @@ if (badge && apiHeading && badge < apiHeading.line)
   fail(`badges must sit below the Quick start (line ${badge})`);
 
 // ── package.json metadata ───────────────────────────────────────────────────
-if (typeof pkg.description !== "string" || pkg.description.length > 160)
+if (
+  typeof pkg.description !== "string" ||
+  pkg.description.length > 160 ||
+  !pkg.description.endsWith(".") ||
+  pkg.description.includes(". ") ||
+  !pkg.description.includes("Convex")
+)
   fail(
-    "package.json description must be one sentence of at most 160 characters",
+    'package.json description must be one sentence (ends with ".", no ". " inside) of at most 160 characters that names Convex',
   );
 if (
   !Array.isArray(pkg.keywords) ||
@@ -148,8 +157,11 @@ const REPO = pkg.repository?.url?.replace(/^git\+/, "").replace(/\.git$/, "");
 const intro = readmeLines.slice(1).find((l) => l.trim() !== "");
 if (intro !== pkg.description)
   fail("the first line after the README title must be the package.json description");
-if (LLMS.split("\n").find((l) => l.startsWith("> ")) !== `> ${pkg.description}`)
-  fail('llms.txt "> " summary line must be the package.json description');
+const llmsLines = LLMS.split("\n");
+const llmsTitle = llmsLines.findIndex((l) => l.startsWith("# "));
+const summary = llmsLines.slice(llmsTitle + 1).find((l) => l.trim() !== "");
+if (llmsTitle === -1 || summary !== `> ${pkg.description}`)
+  fail('llms.txt "> " summary must be the first line after the title and equal the package.json description');
 if (pkg.homepage !== `https://oss.vllnt.com/packages/${NAME}`)
   fail(`package.json homepage must be https://oss.vllnt.com/packages/${NAME}`);
 const SHAPE = {
@@ -199,17 +211,54 @@ for (const file of ["README.md", "docs/API.md", "llms.txt", "CHANGELOG.md"]) {
   }
 }
 
+// Related packages = @vllnt packages this one depends on or imports in src/ or example/.
+const used = new Set(
+  [
+    ...Object.keys(pkg.dependencies ?? {}),
+    ...Object.keys(pkg.peerDependencies ?? {}),
+  ].filter((n) => n.startsWith("@vllnt/")),
+);
+const codeFiles = execFileSync("git", ["ls-files", "src", "example"], {
+  cwd: ROOT,
+  encoding: "utf8",
+})
+  .split("\n")
+  .filter((f) => /\.[cm]?[jt]sx?$/.test(f));
+for (const file of codeFiles) {
+  for (const [, name] of read(file).matchAll(
+    /\b(?:from|import|require)\s*\(?\s*["'](@vllnt\/[a-z0-9-]+)/g,
+  ))
+    used.add(name);
+}
+used.delete(pkg.name);
 const related = section(README, "Related packages").trim().split("\n");
-const relatedNone = related.length === 1 && related[0].startsWith("None.");
-if (!relatedNone && !related.some((l) => l.startsWith("- ")))
-  fail('README "## Related packages" must be one line starting with "None." or a list of packages used in code');
-for (const line of relatedNone ? [] : related) {
-  if (!line.startsWith("- ")) continue;
-  const match = /^- \[`@vllnt\/([a-z0-9-]+)`\]\(([^)]+)\)/.exec(line);
-  if (!match || match[2] !== `https://oss.vllnt.com/packages/${match[1]}`)
+if (used.size === 0) {
+  if (related.length !== 1 || !related[0].startsWith("None."))
     fail(
-      `README "## Related packages" entries must start with [\`@vllnt/<name>\`](https://oss.vllnt.com/packages/<name>): ${line}`,
+      'README "## Related packages" must be one "None." line: no @vllnt package is a dependency or imported in src/ or example/',
     );
+} else {
+  const listed = new Set();
+  for (const line of related) {
+    if (!line.startsWith("- ")) continue;
+    const match = /^- \[`@vllnt\/([a-z0-9-]+)`\]\(([^)]+)\)/.exec(line);
+    if (!match || match[2] !== `https://oss.vllnt.com/packages/${match[1]}`) {
+      fail(
+        `README "## Related packages" entries must start with [\`@vllnt/<name>\`](https://oss.vllnt.com/packages/<name>): ${line}`,
+      );
+      continue;
+    }
+    listed.add(`@vllnt/${match[1]}`);
+    if (!used.has(`@vllnt/${match[1]}`))
+      fail(
+        `README "## Related packages" lists @vllnt/${match[1]}, which is not a dependency or imported in src/ or example/`,
+      );
+  }
+  for (const name of used)
+    if (!listed.has(name))
+      fail(
+        `README "## Related packages" has no entry for ${name} (a dependency or import)`,
+      );
 }
 
 // ── Code blocks ──────────────────────────────────────────────────────────────
@@ -486,7 +535,9 @@ for (const reason of new Set(reasons)) {
     );
 }
 
-// ── README TypeScript examples type-check against the built package ─────────
+// ── README and docs/API.md TypeScript examples type-check against the built package
+// CHANGELOG ts blocks (historical migration snippets for old APIs) and TSDoc
+// @example blocks are not type-checked.
 execFileSync(
   join(ROOT, "node_modules/.bin/tsc"),
   ["--project", "tsconfig.build.json"],
@@ -501,9 +552,9 @@ const HOST_SCHEMA = [
 ].join("\n");
 const virtual = new Map();
 virtual.set(join(HOST, "schema.ts"), HOST_SCHEMA);
-const readmeTs = codeBlocks(README, "README.md").filter((b) => b.lang === "ts");
-readmeTs.forEach((block, i) =>
-  virtual.set(join(HOST, `readme_example_${i}.ts`), block.code + "\n"),
+const examplesTs = blocks.filter((b) => b.lang === "ts");
+examplesTs.forEach((block, i) =>
+  virtual.set(join(HOST, `docs_example_${i}.ts`), block.code + "\n"),
 );
 const options = {
   strict: true,
@@ -525,17 +576,17 @@ host.getSourceFile = (f, lang, ...rest) =>
     ? ts.createSourceFile(f, virtual.get(f), lang)
     : getSourceFile.call(host, f, lang, ...rest);
 const examples = ts.createProgram(
-  readmeTs.map((_, i) => join(HOST, `readme_example_${i}.ts`)),
+  examplesTs.map((_, i) => join(HOST, `docs_example_${i}.ts`)),
   options,
   host,
 );
 for (const diagnostic of ts.getPreEmitDiagnostics(examples)) {
   const file = diagnostic.file?.fileName ?? "";
-  const index = /readme_example_(\d+)\.ts$/.exec(file)?.[1];
-  const where =
-    index === undefined
-      ? file
-      : `README.md:${readmeTs[Number(index)].line + 1 + diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start).line}`;
+  const index = /docs_example_(\d+)\.ts$/.exec(file)?.[1];
+  const block = index === undefined ? undefined : examplesTs[Number(index)];
+  const where = block
+    ? `${block.file}:${block.line + 1 + diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start).line}`
+    : file;
   fail(
     `${where}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " ")}`,
   );
@@ -565,5 +616,5 @@ if (errors.length > 0) {
   process.exit(1);
 }
 console.log(
-  `OK    docs: ${REQUIRED.length} README sections in order, ${blocks.length} code blocks, ${readmeTs.length} README examples type-check, ${thrown.length} errors documented`,
+  `OK    docs: ${REQUIRED.length} README sections in order, ${blocks.length} code blocks, ${examplesTs.length} README and docs/API.md examples type-check, ${thrown.length} errors documented`,
 );
