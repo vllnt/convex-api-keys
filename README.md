@@ -273,7 +273,11 @@ export const keyStatus = query({
 ## Errors and fixes
 
 `validate` never throws for a bad key; it returns `{ valid: false, reason }`.
-Every other method throws an `Error` with one of these messages.
+Every other method throws an `Error` with one of these messages. Match with
+`message.includes(...)` inside your own Convex function: Convex can prefix the
+text (for example `Uncaught Error: `), and a browser client of a production
+deployment receives `Server Error` instead, because these are not
+`ConvexError`s.
 
 | Error or `reason`                                                                             | Cause                                                                      | Fix                                                                  |
 | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -290,7 +294,7 @@ Every other method throws an `Error` with one of these messages.
 | `name must be <= 256 characters`                                                              | `name` is longer than 256 characters                                       | Shorten it                                                           |
 | `Invalid keyPrefix "<prefix>": must match ^[a-zA-Z0-9]+$ (alphanumeric only, no underscores)` | `ApiKeysConfig.prefix` has other characters                                | Use letters and digits only                                          |
 | `keyPrefix must be <= 256 characters`                                                         | `prefix` is longer than 256 characters                                     | Shorten it                                                           |
-| `Invalid env "<env>": must match ^[a-zA-Z0-9-]+$ (no underscores — would break key parsing)`  | `env` has an underscore or other characters                                | Use letters, digits and `-`                                          |
+| `Invalid env "<env>": must match ^[a-zA-Z0-9-]+$ (no underscores — would break key parsing)`  | `env` is empty or has an underscore or other characters                       | Use letters, digits and `-`                                          |
 | `env must be <= 256 characters`                                                               | `env` is longer than 256 characters                                        | Shorten it                                                           |
 | `Invalid tag "<tag>": must be alphanumeric with hyphens, starting with alphanumeric`          | A tag (or `revokeByTag`'s `tag`) is empty or has other characters          | Use letters, digits and `-`, starting with a letter or digit         |
 | `tags must have <= 20 entries (got <n>)`                                                      | More than 20 tags                                                          | Pass at most 20                                                      |
@@ -298,7 +302,7 @@ Every other method throws an `Error` with one of these messages.
 | `metadata must be <= 4096 bytes (got <n>)`                                                    | `JSON.stringify(metadata)` is longer than 4096 characters                  | Store less, or keep a reference to your own table                    |
 | `expiresAt must be in the future (finite timestamp)`                                          | `expiresAt` is in the past, `NaN` or `Infinity`                            | Pass a future `Date.now()`-style timestamp in ms                     |
 | `remaining must be > 0 (finite integer)`                                                      | `remaining` is 0, negative, fractional, `NaN` or `Infinity`                | Pass a positive integer, or leave it out for unlimited use           |
-| `limit must be a positive integer`                                                            | `list` / `listByTag` got `limit` ≤ 0, fractional or `NaN`                  | Pass a positive integer, or leave it out (default 100)               |
+| `limit must be a positive integer`                                                            | `list` / `listByTag` got `limit` ≤ 0, fractional, `NaN` or `Infinity`    | Pass a positive integer, or leave it out (default 100)               |
 | `cannot rotate a terminal key`                                                                | The key is `revoked`, `expired` or `exhausted`                             | Issue a new key with `create`                                        |
 | `can only rotate active keys`                                                                 | The key is `disabled` or already `rotating`                                | `enable` it first, or rotate the newest key                          |
 | `cannot rotate finite-use keys`                                                               | The key has `remaining`                                                    | Create a new key with the remaining quota, then `revoke` the old one |

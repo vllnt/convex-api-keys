@@ -47,8 +47,9 @@
 - `RunMutationCtx` and `RunQueryCtx` accept action and HTTP action contexts.
   They were `Pick`s of the mutation and query context types, which an action
   `ctx` does not satisfy (checked with `convex` 1.45.0 and 1.51.0), so calling
-  `ApiKeys` methods from an action or HTTP action failed to type-check. They are now interfaces with only the
-  `runMutation` / `runQuery` call this package makes.
+  `ApiKeys` methods from an action or HTTP action failed to type-check. They
+  are now interfaces with only the `runMutation` / `runQuery` call, for public
+  and internal function references.
 
 ## [0.3.0] - 2026-11-26
 

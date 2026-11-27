@@ -103,9 +103,9 @@ When any of these change, update the matching docs in the SAME commit (then `pnp
 
 | Change | Update |
 |--------|--------|
-| Mutation/query args or return types | `docs/API.md`, README API table |
-| Schema table added/removed/modified | this file (Architecture), README Architecture |
-| Child component added/removed | README Architecture, this file (Architecture) |
-| New feature / breaking change | `CHANGELOG.md`, README Features |
-| Security model | README Security Model |
+| Mutation/query args or return types | `docs/API.md`, README API table, Errors and fixes |
+| Schema table added/removed/modified | this file (Architecture), README Limits and gotchas |
+| Child component added/removed | README Compatibility, this file (Architecture) |
+| New feature / breaking change | `CHANGELOG.md`, README When to use, API table and Common tasks |
+| Security model | README Security, `docs/API.md` Security Model |
 | `peerDependencies.convex` range | `llms.txt` context line, `docs/API.md` Compatibility line |
