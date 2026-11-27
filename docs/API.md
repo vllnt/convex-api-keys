@@ -121,13 +121,13 @@ Re-enable a disabled key. Requires `ownerId`.
 ### matchStatus(ctx, { key })
 
 Read-only lookup: the stored status of the key matching `key`
-(`"active" | "disabled" | "revoked" | "rotating" | "expired" | "exhausted"`),
-or `null` when `key` is malformed or matches no key. It writes nothing and does
-not count usage. The stored status is not re-evaluated, so a key past
-`expiresAt` (or a rotating key past its grace window) reads as `active` /
-`rotating` until `validate()` marks it expired: treat those two values as
-"maybe valid" and call `validate()` before trusting the key. Also available as
-the component query `components.apiKeys.queries.matchStatus`.
+(`"active" | "disabled" | "revoked" | "rotating" | "expired" | "exhausted"`), or
+`null` when `key` is malformed or matches no key. It writes nothing and does not
+count usage. The stored status is not re-evaluated, so a key past `expiresAt`
+(or a rotating key past its grace window) reads as `active` / `rotating` until
+`validate()` marks it expired: treat those two values as "maybe valid" and call
+`validate()` before trusting the key. Also available as the component query
+`components.apiKeys.queries.matchStatus`.
 
 **Returns:** `KeyStatus | null`
 
@@ -144,7 +144,29 @@ must be finite and > 0. In this version the values are only stored: no cleanup
 job runs and `create()` does not apply `defaultExpiryMs`; pass `expiresAt` to
 `create()` to set an expiry.
 
+## Types
+
+All exported from `@vllnt/convex-api-keys`.
+
+| Type                      | Shape                                                                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `ApiKeysConfig`           | `{ prefix?: string; defaultType?: KeyType }`                                                                                             |
+| `CreateKeyOptions`        | `{ name; ownerId; type?; scopes?; tags?; env?; metadata?; remaining?; expiresAt? }` (see `create`)                                       |
+| `CreateKeyResult`         | `{ keyId: string; key: string }`                                                                                                         |
+| `ValidationResult`        | `{ valid: true; keyId; ownerId; type; env; scopes; tags; metadata?; remaining? }` or `{ valid: false; reason: ValidationFailureReason }` |
+| `ValidationFailureReason` | `"malformed" \| "not_found" \| "revoked" \| "disabled" \| "expired" \| "exhausted"`                                                      |
+| `KeyMetadata`             | `{ keyId; name; lookupPrefix; type; env; scopes; tags; status; metadata?; remaining?; expiresAt?; createdAt; lastUsedAt? }`              |
+| `UsageStats`              | `{ total: number; remaining?: number }`                                                                                                  |
+| `RotateResult`            | `{ newKeyId: string; newKey: string; oldKeyExpiresAt: number }`                                                                          |
+| `KeyType`                 | `"secret" \| "publishable"`                                                                                                              |
+| `KeyStatus`               | `"active" \| "disabled" \| "revoked" \| "rotating" \| "expired" \| "exhausted"`                                                          |
+| `RunMutationCtx`          | `{ runMutation(ref, args) }`: the `ctx` of a mutation, action or HTTP action                                                             |
+| `RunQueryCtx`             | `{ runQuery(ref, args) }`: the `ctx` of a query, mutation, action or HTTP action                                                         |
+
 ## Errors
+
+Every thrown message, its cause and its fix are listed in the README's
+[Errors and fixes](../README.md#errors-and-fixes) table.
 
 Methods that take `keyId` and `ownerId` throw `key not found` for an unknown key
 and `unauthorized: key does not belong to owner` when `ownerId` does not match.
@@ -181,7 +203,7 @@ Status rules:
 
 ## Key Format
 
-```
+```text
 {prefix}_{type}_{env}_{random8}_{secret64}
 
 Examples:
@@ -191,7 +213,7 @@ Examples:
 
 ## Key Lifecycle
 
-```
+```text
 create() → ACTIVE ──→ DISABLED (reversible via enable())
                   ──→ REVOKED  (terminal)
                   ──→ ROTATING (grace period → EXPIRED)

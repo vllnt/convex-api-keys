@@ -1,15 +1,24 @@
 # @vllnt/convex-api-keys
 
-> Secure API key management as a Convex component. Create, validate, revoke, rotate, and track usage with owner-scoped admin APIs, server-side secret generation, and structured audit logging.
+> Convex component to create, validate, revoke and rotate API keys, stored as SHA-256 hashes, with owner scoping, scopes, expiry, use limits and usage counts.
 
-`@vllnt/convex-api-keys` is a publishable Convex component for multi-tenant API key management. Keys are stored as SHA-256 hashes, looked up by prefix, and never persisted in raw form. Requires `convex@^1.45.0` (releases before 0.3.0 targeted `convex@^1.36.1`) and uses `@convex-dev/sharded-counter` for per-key usage counts.
+Keys are stored as SHA-256 hashes and looked up by an indexed 8-character prefix; the raw key is returned once, by `create` or `rotate`. Every admin call checks the `ownerId` you pass in; the host authenticates callers, enforces scopes and rate limits. Requires `convex@^1.45.0` and mounts `@convex-dev/sharded-counter` as a child component for usage counts.
 
-For coding agents: this file, the API reference and the changelog are bundled in the npm package at `node_modules/@vllnt/convex-api-keys/`, next to the source in `src/`. They match the installed version. Read them before writing code against this package.
+This file, the API reference and the changelog are bundled in the npm package at `node_modules/@vllnt/convex-api-keys/`, next to the source in `src/`, and match the installed version.
+
+## When to use
+
+- Use it when a Convex app issues API keys to its users or organizations and checks them on each request.
+- Use it when keys need scopes, tags, an environment, an expiry, a use limit, rotation with a grace period, or per-key usage counts.
+- Use it when one deployment holds keys for many tenants and every admin call must match the key's `ownerId`.
+- Do not use it for short-lived tokens shown once (invite or reset links): use `@vllnt/convex-tokens`.
+- Do not use it for user sign-in sessions or OAuth, or for request rate limiting.
 
 ## Docs
 
-- [README](./README.md): Project overview, installation, usage examples, and security model
-- [API Reference](./docs/API.md): Package exports, `ApiKeys` class methods, return shapes, and input validation rules
+- [README](./README.md): Install, quick start, common tasks, limits and compatibility
+- [API reference](./docs/API.md): Package exports, `ApiKeys` methods, types, input validation, key format and lifecycle
+- [Errors and fixes](./README.md#errors-and-fixes): Every error message and `validate` reason, its cause and the fix
 - [Changelog](./CHANGELOG.md): Version history and release notes
 - [Contributing](https://github.com/vllnt/convex-api-keys/blob/main/CONTRIBUTING.md): Development setup, validation commands, and release workflow notes
 
@@ -20,13 +29,16 @@ These files are on GitHub `main` and may be newer than the installed version.
 - [Example component wrapper](https://github.com/vllnt/convex-api-keys/blob/main/example/convex/example.ts): Host-app wrapper functions around the component API
 - [Example tests](https://github.com/vllnt/convex-api-keys/blob/main/example/convex/example.test.ts): End-to-end usage coverage with `convex-test`
 
-## Ecosystem
-
-- [vllnt oss](https://oss.vllnt.com/llms.txt): Index of the other vllnt open-source packages
-
 ## Optional
 
 - [AGENTS](https://github.com/vllnt/convex-api-keys/blob/main/AGENTS.md): Agent instructions for contributors to this repository
 - [Security Policy](https://github.com/vllnt/convex-api-keys/blob/main/SECURITY.md): Vulnerability reporting policy
 - [Code of Conduct](https://github.com/vllnt/convex-api-keys/blob/main/CODE_OF_CONDUCT.md): Community participation guidelines
 - [License](./LICENSE): MIT license
+
+## Ecosystem
+
+- [Package page](https://oss.vllnt.com/packages/convex-api-keys)
+- [All @vllnt packages](https://oss.vllnt.com/llms.txt)
+- [vllnt](https://vllnt.com/llms.txt)
+- [Author](https://bntvllnt.com)
