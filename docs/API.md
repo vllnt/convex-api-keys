@@ -5,12 +5,12 @@
 
 ## Package exports
 
-| Import path                                   | Exports                                                                                                                                                                                                                            |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@vllnt/convex-api-keys`                      | `ApiKeys` class; types `ApiKeysConfig`, `CreateKeyOptions`, `CreateKeyResult`, `ValidationResult`, `ValidationFailureReason`, `KeyMetadata`, `UsageStats`, `RotateResult`, `KeyType`, `KeyStatus`, `RunMutationCtx`, `RunQueryCtx` |
-| `@vllnt/convex-api-keys/convex.config`        | default: the component definition, passed to `app.use()`                                                                                                                                                                           |
-| `@vllnt/convex-api-keys/test`                 | `register(t, name = "apiKeys")` to mount the component in `convex-test` (TypeScript source; needs Vite's `import.meta.glob`)                                                                                                       |
-| `@vllnt/convex-api-keys/_generated/component` | type `ComponentApi` (the type of `components.apiKeys`)                                                                                                                                                                             |
+| Import path                                           | Exports                                                                                                                                                                                                                            |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@vllnt/convex-api-keys`                              | `ApiKeys` class; types `ApiKeysConfig`, `CreateKeyOptions`, `CreateKeyResult`, `ValidationResult`, `ValidationFailureReason`, `KeyMetadata`, `UsageStats`, `RotateResult`, `KeyType`, `KeyStatus`, `RunMutationCtx`, `RunQueryCtx` |
+| `@vllnt/convex-api-keys/convex.config` (`.js`)        | default: the component definition, passed to `app.use()`                                                                                                                                                                           |
+| `@vllnt/convex-api-keys/test`                         | `register(t, name = "apiKeys")` to mount the component in `convex-test`, plus a default export `{ register, schema, modules }` (TypeScript source; needs Vite's `import.meta.glob`)                                                |
+| `@vllnt/convex-api-keys/_generated/component` (`.js`) | type `ComponentApi` (the type of `components.apiKeys`)                                                                                                                                                                             |
 
 `RunMutationCtx` is any context with `runMutation` (mutation or action);
 `RunQueryCtx` is any context with `runQuery` (query, mutation or action).
@@ -61,7 +61,9 @@ or `{ valid: false, reason }`
 
 ### revoke(ctx, { keyId, ownerId })
 
-Permanently revoke a key. Idempotent. Requires `ownerId` for auth boundary.
+Permanently revoke a key. Requires `ownerId` for auth boundary. Any status
+except `revoked` becomes `revoked`, including `expired` and `exhausted`;
+revoking a key that is already revoked does nothing.
 
 ### revokeByTag(ctx, { ownerId, tag })
 
@@ -95,6 +97,8 @@ keys or hashes. There is no cursor or continuation token.
 
 Return a bounded array of keys matching a tag (default limit 100). There is no
 cursor or continuation token; repeating the call does not advance a page.
+
+**Returns:** `KeyMetadata[]` (same shape as `list`)
 
 ### update(ctx, { keyId, ownerId, name?, scopes?, tags?, metadata? })
 
@@ -135,24 +139,39 @@ must be finite and > 0. In this version the values are only stored: no cleanup
 job runs and `create()` does not apply `defaultExpiryMs`; pass `expiresAt` to
 `create()` to set an expiry.
 
+## Errors
+
+Methods that take `keyId` and `ownerId` throw `key not found` for an unknown key
+and `unauthorized: key does not belong to owner` when `ownerId` does not match.
+Status rules:
+
+- `update()` throws `cannot update terminal key` for `revoked`, `expired` and
+  `exhausted` keys.
+- `disable()` works on `active` keys only; disabling a `disabled` key does
+  nothing.
+- `enable()` works on `disabled` keys only; enabling an `active` key does
+  nothing.
+- `rotate()` works on `active` keys without `remaining` and not past
+  `expiresAt`.
+
 ## Input Validation
 
-| Field               | Constraint                                                   |
-| ------------------- | ------------------------------------------------------------ |
-| `keyPrefix`         | `^[a-zA-Z0-9]+$` (no underscores)                            |
-| `env`               | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing) |
-| `ownerId`           | must not be empty (`ownerId must not be empty`)              |
-| `name`              | must not be empty, max 256 characters                        |
-| `metadata`          | max 4KB (JSON serialized)                                    |
-| `scopes`            | max 50 entries                                               |
-| `tags`              | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$`   |
-| `gracePeriodMs`     | min 60,000 (60s), max 2,592,000,000 (30 days); NaN rejected  |
-| `tag` (revokeByTag) | same pattern as `tags`; empty is rejected (`Invalid tag`)    |
-| `remaining`         | finite integer > 0                                           |
-| `expiresAt`         | finite timestamp in the future (NaN/Infinity rejected)       |
-| `limit` (queries)   | positive integer (`limit must be a positive integer`)        |
-| `cleanupIntervalMs` | finite number > 0                                            |
-| `defaultExpiryMs`   | finite number > 0                                            |
+| Field               | Constraint                                                                       |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `keyPrefix`         | `^[a-zA-Z0-9]+$` (no underscores), max 256 characters                            |
+| `env`               | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing), max 256 characters |
+| `ownerId` (create)  | must not be empty (`ownerId must not be empty`)                                  |
+| `name`              | must not be empty, max 256 characters                                            |
+| `metadata`          | max 4096 characters of `JSON.stringify` output                                   |
+| `scopes`            | max 50 entries                                                                   |
+| `tags`              | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$`                       |
+| `gracePeriodMs`     | min 60,000 (60s), max 2,592,000,000 (30 days); NaN rejected                      |
+| `tag` (revokeByTag) | same pattern as `tags`; empty is rejected (`Invalid tag`)                        |
+| `remaining`         | finite integer > 0                                                               |
+| `expiresAt`         | finite timestamp in the future (NaN/Infinity rejected)                           |
+| `limit` (queries)   | positive integer (`limit must be a positive integer`)                            |
+| `cleanupIntervalMs` | finite number > 0                                                                |
+| `defaultExpiryMs`   | finite number > 0                                                                |
 
 ## Key Format
 
@@ -161,7 +180,7 @@ job runs and `create()` does not apply `defaultExpiryMs`; pass `expiresAt` to
 
 Examples:
   myapp_secret_live_a1b2c3d4_<hex>    ← production secret
-  myapp_pub_test_e5f6g7h8_<hex>       ← test publishable
+  myapp_pub_test_e5f6a7b8_<hex>       ← test publishable
 ```
 
 ## Key Lifecycle

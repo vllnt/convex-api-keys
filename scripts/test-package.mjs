@@ -26,12 +26,8 @@ const FORBIDDEN = [
 ];
 const REPO_BLOB = /^https:\/\/github\.com\/vllnt\/convex-api-keys\/blob\/[^/]+\/(.+)$/;
 
-const output = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
-  encoding: "utf8",
-});
-const packed = new Set(
-  JSON.parse(output)[0].files.map((file) => file.path.replace(/^package\//, "")),
-);
+const output = execFileSync("pnpm", ["pack", "--dry-run", "--json"], { encoding: "utf8" });
+const packed = new Set(JSON.parse(output).files.map((file) => file.path));
 
 const errors = [];
 for (const path of REQUIRED) {

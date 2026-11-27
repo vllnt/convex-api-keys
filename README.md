@@ -173,8 +173,9 @@ See [docs/API.md](docs/API.md).
 ## Testing your app
 
 `@vllnt/convex-api-keys/test` exports `register(t, name = "apiKeys")` to mount
-the component in a `convex-test` instance. It needs `convex-test` and `vitest`
-(with Vite's `import.meta.glob`) in the consuming app:
+the component in a `convex-test` instance. It needs `convex-test`, `vitest`
+(with Vite's `import.meta.glob`) and `@convex-dev/sharded-counter` (for its
+`/test` helper) installed in the consuming app:
 
 ```ts
 /// <reference types="vite/client" />
@@ -203,8 +204,9 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for development setup, testing, and PR
-guidelines.
+See
+[CONTRIBUTING.md](https://github.com/vllnt/convex-api-keys/blob/main/CONTRIBUTING.md)
+for development setup, testing, and PR guidelines.
 
 ## Author
 

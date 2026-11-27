@@ -15,6 +15,8 @@ For coding agents: this file, the API reference and the changelog are bundled in
 
 ## Examples
 
+These files are on GitHub `main` and may be newer than the installed version.
+
 - [Example component wrapper](https://github.com/vllnt/convex-api-keys/blob/main/example/convex/example.ts): Host-app wrapper functions around the component API
 - [Example tests](https://github.com/vllnt/convex-api-keys/blob/main/example/convex/example.test.ts): End-to-end usage coverage with `convex-test`
 
