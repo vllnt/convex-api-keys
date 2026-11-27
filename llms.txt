@@ -2,7 +2,7 @@
 
 > Convex component to create, validate, revoke and rotate API keys, stored as SHA-256 hashes, with owner scoping, scopes, expiry, use limits and usage counts.
 
-Keys are stored as SHA-256 hashes and looked up by an indexed 8-character prefix; the raw key is returned once, by `create` or `rotate`. Every admin call checks the `ownerId` you pass in; the host authenticates callers, enforces scopes and rate limits. Requires `convex@^1.45.0` and mounts `@convex-dev/sharded-counter` as a child component for usage counts.
+Keys are stored as SHA-256 hashes and looked up by an indexed 8-character prefix; the raw key is returned once, by `create` or `rotate`. Every key-level admin call checks the `ownerId` you pass in; the host authenticates callers, enforces scopes and rate limits. Requires `convex@^1.45.0` and mounts `@convex-dev/sharded-counter` as a child component for usage counts.
 
 This file, the API reference and the changelog are bundled in the npm package at `node_modules/@vllnt/convex-api-keys/`, next to the source in `src/`, and match the installed version.
 
@@ -10,7 +10,7 @@ This file, the API reference and the changelog are bundled in the npm package at
 
 - Use it when a Convex app issues API keys to its users or organizations and checks them on each request.
 - Use it when keys need scopes, tags, an environment, an expiry, a use limit, rotation with a grace period, or per-key usage counts.
-- Use it when one deployment holds keys for many tenants and every admin call must match the key's `ownerId`.
+- Use it when one deployment holds keys for many tenants and every key-level admin call must match the key's `ownerId`.
 - Do not use it for short-lived tokens shown once (invite or reset links): use `@vllnt/convex-tokens`.
 - Do not use it for user sign-in sessions or OAuth, or for request rate limiting.
 

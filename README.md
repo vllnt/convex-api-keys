@@ -14,15 +14,15 @@ version. Read them before writing code against this package.
   checks them on each request.
 - Use it when keys need scopes, tags, an environment, an expiry, a use limit,
   rotation with a grace period, or per-key usage counts.
-- Use it when one deployment holds keys for many tenants and every admin call
-  must match the key's `ownerId`.
+- Use it when one deployment holds keys for many tenants and every key-level
+  admin call must match the key's `ownerId`.
 - Do not use it when the token is short-lived and shown once (invite or reset
   links): use
   [`@vllnt/convex-tokens`](https://oss.vllnt.com/packages/convex-tokens).
 - Do not use it when you need user sign-in sessions or OAuth: use
   [Convex Auth](https://labs.convex.dev/auth) or your identity provider.
 - Do not use it when you need request rate limiting: use
-  [`@convex-dev/rate-limiter`](https://www.npmjs.com/package/@convex-dev/rate-limiter);
+  [`@convex-dev/rate-limiter`](https://github.com/convex/rate-limiter);
   this package has none.
 
 ## Install
@@ -273,14 +273,15 @@ export const keyStatus = query({
 `validate` never throws for a bad key; it returns `{ valid: false, reason }`.
 Every other method throws an `Error` with one of these messages. Match with
 `message.includes(...)` inside your own Convex function: Convex can prefix the
-text (for example `Uncaught Error: `), and a browser client of a production
-deployment receives `Server Error` instead, because these are not
-`ConvexError`s.
+text (for example `Uncaught Error: `), and a client of a production
+deployment receives a generic `Server Error` message instead, because these are
+not `ConvexError`s (see
+[Convex error handling](https://docs.convex.dev/functions/error-handling#differences-in-error-reporting-between-dev-and-prod)).
 
 | Error or `reason`                                                                             | Cause                                                                      | Fix                                                                  |
 | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `reason: "malformed"`                                                                         | The string is not `{prefix}_{type}_{env}_{8 chars}_{64 hex}`               | Send the full key as returned by `create` or `rotate`                |
-| `reason: "not_found"`                                                                         | No stored key has this prefix and hash                                     | The key was mistyped or never existed; ask for a new key             |
+| `reason: "malformed"`                                                                         | The string is not `{prefix}_{type}_{env}_{8 chars}_{64 chars}`             | Send the full key as returned by `create` or `rotate`                |
+| `reason: "not_found"`                                                                         | No stored key has this prefix and hash (also a 64-character secret that is not hex) | The key was mistyped or never existed; ask for a new key             |
 | `reason: "revoked"`                                                                           | The key was revoked                                                        | Issue a new key with `create`                                        |
 | `reason: "disabled"`                                                                          | The key was paused with `disable`                                          | Call `enable`, or issue a new key                                    |
 | `reason: "expired"`                                                                           | `expiresAt` passed, or a rotated key's grace period ended                  | Use the key returned by `rotate`, or issue a new key                 |
@@ -311,7 +312,7 @@ deployment receives `Server Error` instead, because these are not
 | `can only enable disabled keys`                                                               | `enable` on a key that is not `disabled` or `active`                       | Only resume disabled keys                                            |
 | `cleanupIntervalMs must be > 0 (finite number)`                                               | `configure` got 0, negative, `NaN` or `Infinity`                           | Pass a positive finite number                                        |
 | `defaultExpiryMs must be > 0 (finite number)`                                                 | `configure` got 0, negative, `NaN` or `Infinity`                           | Pass a positive finite number                                        |
-| `ArgumentValidationError` (thrown by Convex)                                                  | An argument has the wrong type, e.g. a `keyId` that is not an `apiKeys` id | Pass `keyId` values returned by this component                       |
+| Argument validation error (message from Convex)                                               | An argument does not match its validator, e.g. a `keyId` that is not an `apiKeys` id; Convex rejects the call before the handler runs | Pass `keyId` values returned by this component                       |
 
 ## Limits and gotchas
 
@@ -321,8 +322,10 @@ deployment receives `Server Error` instead, because these are not
   1 hour, `limit` 100.
 - Limits: `name`, `prefix` and `env` 256 characters; `metadata` 4096 characters
   of JSON; 50 `scopes`; 20 `tags`; `gracePeriodMs` 60 seconds to 30 days.
-- Key format: `{prefix}_{secret|pub}_{env}_{8 chars}_{64 hex}`. `prefix` and
-  `env` cannot contain `_`.
+- Key format: `{prefix}_{secret|pub}_{env}_{8 chars}_{64 chars}`. Keys are
+  generated with a hex secret, but parsing checks only the secret's length: a
+  64-character secret that is not hex returns `not_found`. `prefix` and `env` cannot
+  contain `_`.
 - Expiry is checked by `validate`. Until it runs, a key past `expiresAt` (or a
   rotated key past its grace period) is stored as `active` / `rotating`, so
   `matchStatus` and `list` show that status, and `revoke` / `revokeByTag` still
@@ -337,7 +340,8 @@ deployment receives `Server Error` instead, because these are not
   instead.
 - `list` and `listByTag` return at most `limit` keys and have no cursor; calling
   again returns the same keys.
-- Rotation only works on `active` keys without `remaining`.
+- Rotation only works on `active` keys without `remaining` that are not past
+  `expiresAt`.
 - The component has no rate limiting and does not enforce scopes: `validate`
   returns `scopes`, and your code decides.
 - `ownerId` is an opaque string you pass in. The component checks that it
@@ -345,7 +349,7 @@ deployment receives `Server Error` instead, because these are not
 
 ## Compatibility
 
-- Peer dependency: `convex@^1.45.0` (releases before 0.3.0 required `^1.36.1`).
+- Peer dependency: `convex@^1.45.0` (0.2.0 required `^1.36.1`, 0.1.0 `^1.33.0`).
 - Runtime dependency: `@convex-dev/sharded-counter` (mounted as a child
   component for usage counts).
 - The client works in Convex queries, mutations, actions and HTTP actions (any

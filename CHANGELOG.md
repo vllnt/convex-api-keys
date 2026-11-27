@@ -56,10 +56,9 @@
   `npm pkg fix` would rewrite any field.
 - `RunMutationCtx` and `RunQueryCtx` accept action and HTTP action contexts.
   They were `Pick`s of the mutation and query context types, which an action
-  `ctx` does not satisfy (checked with `convex` 1.45.0 and 1.51.0), so calling
-  `ApiKeys` methods from an action or HTTP action failed to type-check. They
-  are now interfaces with only the `runMutation` / `runQuery` call, for public
-  and internal function references.
+  `ctx` does not satisfy, so calling `ApiKeys` methods from an action or HTTP
+  action failed to type-check. They are now interfaces with only the
+  `runMutation` / `runQuery` call, for public and internal function references.
 
 ## [0.3.0] - 2026-11-26
 
@@ -126,7 +125,8 @@
   from return type.
 - **`validate()`**: `retryAfter` removed from failure response (no internal rate
   limiting).
-- **`list()` / `listByTag()`**: Now paginated with `limit` param (default 100).
+- **`list()` / `listByTag()`**: Now return at most `limit` keys (default 100).
+  There is no cursor.
 
 ### Migration Guide
 
@@ -175,7 +175,9 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 - Public client wrapper now forwards optional `limit` to `list()` and
   `listByTag()`
 - `ValidationFailure` no longer advertises the removed `retryAfter` field
-- Auth boundary: `ownerId` cross-check on all admin mutations
+- Auth boundary: `ownerId` cross-check on every key-level admin call
+  (`revoke`, `rotate`, `update`, `disable`, `enable`, `getUsage`); `configure`
+  takes no `ownerId`
 - Server-side secret generation for `create()` and `rotate()`
 - Input validation: keyPrefix charset, env charset, gracePeriodMs bounds
   (60s–30d), metadata size (4KB), scopes (50), tags (20)
@@ -184,7 +186,7 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 - lastUsedAt throttled to 60s (reduces OCC contention)
 - Remaining decrement decoupled from lastUsedAt write (single merged patch)
 - revokeByTag expanded to include `rotating` and `disabled` statuses
-- Paginated list/listByTag with configurable limit
+- `list`/`listByTag` return at most `limit` keys (default 100), with no cursor
 
 ## 0.1.1
 

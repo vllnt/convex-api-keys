@@ -1,7 +1,7 @@
 # API Reference — @vllnt/convex-api-keys
 
-**Compatibility:** requires `convex@^1.45.0` (releases before `0.3.0` required
-`convex@^1.36.1`).
+**Compatibility:** requires `convex@^1.45.0` (0.2.0 required `^1.36.1`, 0.1.0
+`^1.33.0`).
 
 ## Package exports
 
@@ -12,8 +12,9 @@
 | `@vllnt/convex-api-keys/test`                         | `register(t, name = "apiKeys")` to mount the component in `convex-test`, plus a default export `{ register, schema, modules }` (TypeScript source; needs Vite's `import.meta.glob`)                                                |
 | `@vllnt/convex-api-keys/_generated/component` (`.js`) | type `ComponentApi` (the type of `components.apiKeys`)                                                                                                                                                                             |
 
-`RunMutationCtx` is any context with `runMutation` (mutation or action);
-`RunQueryCtx` is any context with `runQuery` (query, mutation or action).
+`RunMutationCtx` is any context with `runMutation` (mutation, action or HTTP
+action); `RunQueryCtx` is any context with `runQuery` (query, mutation, action
+or HTTP action).
 
 ## ApiKeys Class
 
@@ -133,7 +134,9 @@ count usage. The stored status is not re-evaluated, so a key past `expiresAt`
 
 ### getUsage(ctx, { keyId, ownerId })
 
-Get usage count for a key. Returns O(1) counter value.
+Get usage for a key. `total` is the number of successful `validate()` calls for
+it (failed validations are not counted); `remaining` is its remaining uses, if
+set.
 
 **Returns:** `{ total: number, remaining?: number }`
 
@@ -214,11 +217,17 @@ Examples:
 ## Key Lifecycle
 
 ```text
-create() → ACTIVE ──→ DISABLED (reversible via enable())
-                  ──→ REVOKED  (terminal)
-                  ──→ ROTATING (grace period → EXPIRED)
-                  ──→ EXPIRED  (terminal, time-based)
-                  ──→ EXHAUSTED (terminal, remaining=0)
+create() → ACTIVE ──→ DISABLED  (disable())
+                  ──→ REVOKED   (terminal; revoke() or revokeByTag())
+                  ──→ ROTATING  (rotate())
+                  ──→ EXPIRED   (terminal; validate() after expiresAt)
+                  ──→ EXHAUSTED (terminal; validate() uses the last of remaining)
+
+DISABLED ──→ ACTIVE   (enable())
+         ──→ REVOKED  (revoke() or revokeByTag())
+
+ROTATING ──→ EXPIRED  (validate() after the grace period or expiresAt)
+         ──→ REVOKED  (revoke() or revokeByTag())
 ```
 
 ## Security Model

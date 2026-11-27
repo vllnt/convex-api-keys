@@ -1,4 +1,4 @@
 import { v } from "convex/values";
 
-/** Arbitrary JSON metadata attached to keys, events, or config. */
+/** Arbitrary JSON metadata stored on a key. */
 export const jsonValue = v.any();
