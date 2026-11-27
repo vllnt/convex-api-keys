@@ -1,4 +1,4 @@
-import type { GenericMutationCtx, GenericQueryCtx, GenericDataModel } from "convex/server";
+import type { FunctionReference, FunctionReturnType, OptionalRestArgs } from "convex/server";
 import type { ComponentApi } from "../component/_generated/component.js";
 import type {
   CreateKeyOptions,
@@ -25,10 +25,20 @@ export type {
 };
 
 /** Any Convex context that can run a mutation: a mutation, action or HTTP action `ctx`. */
-export type RunMutationCtx = Pick<GenericMutationCtx<GenericDataModel>, "runMutation">;
+export interface RunMutationCtx {
+  runMutation<Mutation extends FunctionReference<"mutation", "internal">>(
+    mutation: Mutation,
+    ...args: OptionalRestArgs<Mutation>
+  ): Promise<FunctionReturnType<Mutation>>;
+}
 
 /** Any Convex context that can run a query: a query, mutation, action or HTTP action `ctx`. */
-export type RunQueryCtx = Pick<GenericQueryCtx<GenericDataModel>, "runQuery">;
+export interface RunQueryCtx {
+  runQuery<Query extends FunctionReference<"query", "internal">>(
+    query: Query,
+    ...args: OptionalRestArgs<Query>
+  ): Promise<FunctionReturnType<Query>>;
+}
 
 /** Options for `new ApiKeys(component, config)`. */
 export interface ApiKeysConfig {
