@@ -9,6 +9,8 @@ import ts from "typescript";
 // or a `...` gap, a relative link or anchor breaks, a public export lacks TSDoc
 // or a README/API entry, an error message is missing from "Errors and fixes",
 // or a README TypeScript example stops type-checking against the built package.
+// It also pins the README intro and llms.txt summary to the package.json
+// description, and the README Links section, footer and llms.txt Ecosystem block.
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), "..");
 const read = (file) => readFileSync(join(ROOT, file), "utf8");
@@ -37,6 +39,7 @@ const AFTER = [
   "Security",
   "Related packages",
   "Contributing",
+  "Links",
   "License",
 ];
 const pkg = JSON.parse(read("package.json"));
@@ -74,6 +77,8 @@ for (const name of AFTER) {
   else if (at < cursor) fail(`README "## ${name}" is out of order`);
   else cursor = at;
 }
+if (h2[h2.indexOf("License") - 1] !== "Links")
+  fail('README "## Links" must come directly before "## License"');
 
 function section(markdown, name) {
   const lines = markdown.split("\n");
@@ -139,6 +144,12 @@ if (
 )
   fail("package.json keywords must have 8 to 12 entries");
 const NAME = pkg.name.replace(/^@[^/]+\//, "");
+const REPO = pkg.repository?.url?.replace(/^git\+/, "").replace(/\.git$/, "");
+const intro = readmeLines.slice(1).find((l) => l.trim() !== "");
+if (intro !== pkg.description)
+  fail("the first line after the README title must be the package.json description");
+if (!LLMS.split("\n").includes(`> ${pkg.description}`))
+  fail('llms.txt "> " summary line must be the package.json description');
 if (pkg.homepage !== `https://oss.vllnt.com/packages/${NAME}`)
   fail(`package.json homepage must be https://oss.vllnt.com/packages/${NAME}`);
 const SHAPE = {
@@ -157,7 +168,19 @@ if (!README.endsWith(FOOTER))
   fail(
     'README must end with the vllnt footer (--- then the "Part of [vllnt open source]..." line)',
   );
-const LLMS_ECOSYSTEM = `## Ecosystem\n\n- [Package page](https://oss.vllnt.com/packages/${NAME})\n- [All @vllnt packages](https://oss.vllnt.com/llms.txt)\n- [vllnt](https://vllnt.com/llms.txt)\n- [Author](https://bntvllnt.com)\n`;
+const LINKS = [
+  "",
+  `- Docs and changelog: [oss.vllnt.com/packages/${NAME}](https://oss.vllnt.com/packages/${NAME}) · [release feed](https://oss.vllnt.com/packages/${NAME}/rss.xml)`,
+  "- All @vllnt packages: [oss.vllnt.com](https://oss.vllnt.com) · [search packages and docs on index.vllnt.com](https://index.vllnt.com)",
+  `- Source and issues: [GitHub](${REPO}) · [issues](${REPO}/issues)`,
+  "- Questions and updates: [Discord](https://bntvllnt.com/discord) · [X @bntvllnt](https://x.com/bntvllnt)",
+  "- Company and author: [vllnt.com](https://vllnt.com) · [bntvllnt.com](https://bntvllnt.com) · [GitHub @bntvllnt](https://github.com/bntvllnt) · [LinkedIn](https://linkedin.com/in/bntvllnt)",
+  "- Sponsor: [GitHub Sponsors](https://github.com/sponsors/bntvllnt)",
+  "",
+].join("\n");
+if (section(README, "Links") !== LINKS)
+  fail('README "## Links" must be exactly the vllnt Links list (docs, packages, source, community, author, sponsor)');
+const LLMS_ECOSYSTEM = `## Ecosystem\n\n- [Package page](https://oss.vllnt.com/packages/${NAME})\n- [Release feed](https://oss.vllnt.com/packages/${NAME}/rss.xml)\n- [All @vllnt packages](https://oss.vllnt.com/llms.txt)\n- [Search vllnt packages and docs](https://index.vllnt.com)\n- [vllnt](https://vllnt.com/llms.txt)\n- [Author](https://bntvllnt.com)\n`;
 if (!LLMS.endsWith(LLMS_ECOSYSTEM))
   fail("llms.txt must end with the vllnt Ecosystem block");
 if (LLMS.split("https://oss.vllnt.com/llms.txt").length !== 2)
@@ -176,7 +199,11 @@ for (const file of ["README.md", "docs/API.md", "llms.txt", "CHANGELOG.md"]) {
   }
 }
 
-for (const line of section(README, "Related packages").split("\n")) {
+const related = section(README, "Related packages").trim().split("\n");
+const relatedNone = related.length === 1 && related[0].startsWith("None.");
+if (!relatedNone && !related.some((l) => l.startsWith("- ")))
+  fail('README "## Related packages" must be one line starting with "None." or a list of packages used in code');
+for (const line of relatedNone ? [] : related) {
   if (!line.startsWith("- ")) continue;
   const match = /^- \[`@vllnt\/([a-z0-9-]+)`\]\(([^)]+)\)/.exec(line);
   if (!match || match[2] !== `https://oss.vllnt.com/packages/${match[1]}`)

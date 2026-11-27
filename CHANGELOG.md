@@ -38,6 +38,16 @@
   of every message and `validate` reason, Limits and gotchas, and
   Compatibility. `llms.txt` carries the same summary and links.
 - `package.json` `description` and `keywords` describe what the package does.
+- The README intro is the `package.json` `description`, the same sentence as
+  the `llms.txt` summary.
+- The README has a Links section (docs, release feed, package search, source,
+  community, author, sponsor) that replaces the Author section.
+- README Related packages lists only packages this one uses in code; it is now
+  "None.".
+- The `llms.txt` Ecosystem block links the release feed and package search.
+- `scripts/check-docs.mjs` enforces the intro sentence, the Links section and
+  its place before License, the Related packages rule and the new Ecosystem
+  block.
 
 ### Fixed
 

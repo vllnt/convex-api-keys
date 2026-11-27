@@ -1,8 +1,6 @@
 # @vllnt/convex-api-keys
 
-A [Convex component](https://docs.convex.dev/components) that creates,
-validates, revokes and rotates API keys, stored as SHA-256 hashes and scoped to
-an owner.
+Convex component to create, validate, revoke and rotate API keys, stored as SHA-256 hashes, with owner scoping, scopes, expiry, use limits and usage counts.
 
 ## For coding agents
 
@@ -396,16 +394,7 @@ See [docs/API.md](./docs/API.md#security-model).
 
 ## Related packages
 
-- [`@vllnt/convex-tokens`](https://oss.vllnt.com/packages/convex-tokens) —
-  short-lived tokens shown once, with a TTL that always expires and revoke (for
-  example invite or reset links). Use convex-api-keys for long-lived keys with
-  rotation, usage counts and per-owner listing.
-- [`@vllnt/convex-permissions`](https://oss.vllnt.com/packages/convex-permissions)
-  — role-based access control. Use it to decide what a validated key's owner may
-  do; this package only returns the key's `scopes`.
-- [`@vllnt/convex-quota`](https://oss.vllnt.com/packages/convex-quota) —
-  allowances that reset on a schedule (per day, week, month). Use it for per-key
-  plan limits; `remaining` here is a one-off counter that never resets.
+None. No other @vllnt package is used at runtime or in tests; `@vllnt/eslint-config` and `@vllnt/typescript` are development tools only.
 
 ## Contributing
 
@@ -413,12 +402,14 @@ See
 [CONTRIBUTING.md](https://github.com/vllnt/convex-api-keys/blob/main/CONTRIBUTING.md)
 for development setup, testing, and PR guidelines.
 
-## Author
+## Links
 
-Built by [bntvllnt](https://github.com/bntvllnt) ·
-[bntvllnt.com](https://bntvllnt.com) · [X @bntvllnt](https://x.com/bntvllnt)
-
-If this is useful, [sponsor the work](https://github.com/sponsors/bntvllnt).
+- Docs and changelog: [oss.vllnt.com/packages/convex-api-keys](https://oss.vllnt.com/packages/convex-api-keys) · [release feed](https://oss.vllnt.com/packages/convex-api-keys/rss.xml)
+- All @vllnt packages: [oss.vllnt.com](https://oss.vllnt.com) · [search packages and docs on index.vllnt.com](https://index.vllnt.com)
+- Source and issues: [GitHub](https://github.com/vllnt/convex-api-keys) · [issues](https://github.com/vllnt/convex-api-keys/issues)
+- Questions and updates: [Discord](https://bntvllnt.com/discord) · [X @bntvllnt](https://x.com/bntvllnt)
+- Company and author: [vllnt.com](https://vllnt.com) · [bntvllnt.com](https://bntvllnt.com) · [GitHub @bntvllnt](https://github.com/bntvllnt) · [LinkedIn](https://linkedin.com/in/bntvllnt)
+- Sponsor: [GitHub Sponsors](https://github.com/sponsors/bntvllnt)
 
 ## License
 
