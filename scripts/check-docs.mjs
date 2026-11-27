@@ -148,7 +148,7 @@ const REPO = pkg.repository?.url?.replace(/^git\+/, "").replace(/\.git$/, "");
 const intro = readmeLines.slice(1).find((l) => l.trim() !== "");
 if (intro !== pkg.description)
   fail("the first line after the README title must be the package.json description");
-if (!LLMS.split("\n").includes(`> ${pkg.description}`))
+if (LLMS.split("\n").find((l) => l.startsWith("> ")) !== `> ${pkg.description}`)
   fail('llms.txt "> " summary line must be the package.json description');
 if (pkg.homepage !== `https://oss.vllnt.com/packages/${NAME}`)
   fail(`package.json homepage must be https://oss.vllnt.com/packages/${NAME}`);
