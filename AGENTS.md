@@ -49,8 +49,9 @@ src/
   `ownerId` from its own auth layer and passes it in as an opaque string; decides when to expose key
   operations to end-users.
 - **Auth:** the host gates every management mutation; the component never calls auth libs — it only
-  enforces that the supplied `ownerId` matches the key's stored owner (prevents cross-tenant bugs,
-  not a compromised host).
+  enforces, in the key-level admin calls, that the supplied `ownerId` matches the key's stored owner
+  (prevents cross-tenant bugs, not a compromised host). `configure` takes no `ownerId`, so the host
+  alone decides who may call it.
 
 ## Key design decisions
 
@@ -65,8 +66,10 @@ src/
   layer where real caller context (IP, plan, auth) is available; the component has none.
 - **No event table:** structured logging (`log.ts`) replaces a `apiKeyEvents` DB table — eliminates
   unbounded growth, O(N) scans, and retention complexity.
-- **`ownerId` as the only auth boundary:** all admin mutations assert `key.ownerId === args.ownerId`
-  before any state change; this prevents cross-tenant bugs in honest host apps, not a hostile host.
+- **`ownerId` as the only auth boundary:** the key-level admin calls (`revoke`, `rotate`, `update`,
+  `disable`, `enable`, `getUsage`) assert `key.ownerId === args.ownerId` before changing or reading
+  the key; `revokeByTag` selects only the owner's keys through its index; `configure` takes no
+  `ownerId`. This prevents cross-tenant bugs in honest host apps, not a hostile host.
 
 ## Conventions
 
