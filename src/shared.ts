@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 
 export const KEY_TYPE = v.union(v.literal("secret"), v.literal("publishable"));
+/** Key type, encoded in the key string as `secret` or `pub`. */
 export type KeyType = "secret" | "publishable";
 
 export const KEY_STATUS = v.union(
@@ -11,6 +12,7 @@ export const KEY_STATUS = v.union(
   v.literal("expired"),
   v.literal("exhausted"),
 );
+/** Stored key status. `revoked`, `expired` and `exhausted` are final. */
 export type KeyStatus =
   | "active"
   | "disabled"
