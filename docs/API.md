@@ -11,6 +11,7 @@
 | `@vllnt/convex-api-keys/convex.config` (`.js`)        | default: the component definition, passed to `app.use()`                                                                                                                                                                           |
 | `@vllnt/convex-api-keys/test`                         | `register(t, name = "apiKeys")` to mount the component in `convex-test`, plus a default export `{ register, schema, modules }` (TypeScript source; needs Vite's `import.meta.glob`)                                                |
 | `@vllnt/convex-api-keys/_generated/component` (`.js`) | type `ComponentApi` (the type of `components.apiKeys`)                                                                                                                                                                             |
+| `@vllnt/convex-api-keys/package.json`                 | the package manifest, for tools that read the installed version                                                                                                                                                                    |
 
 `RunMutationCtx` is any context with `runMutation` (mutation, action or HTTP
 action); `RunQueryCtx` is any context with `runQuery` (query, mutation, action
@@ -28,6 +29,9 @@ const apiKeys = new ApiKeys(components.apiKeys, {
 });
 ```
 
+`apiKeys.component` is the mounted `ComponentApi` passed to the constructor
+(`components.apiKeys`).
+
 ## Methods
 
 ### create(ctx, options)
@@ -43,7 +47,7 @@ key once — only the hash is stored.
 | `scopes`    | `string[]`                  | no       | Permission scopes (max 50)                                    |
 | `tags`      | `string[]`                  | no       | Filterable tags (max 20)                                      |
 | `env`       | `string`                    | no       | Environment (default: `"live"`, must match `^[a-zA-Z0-9-]+$`) |
-| `metadata`  | `Record<string, unknown>`   | no       | Arbitrary JSON (max 4KB)                                      |
+| `metadata`  | `Record<string, unknown>`   | no       | Arbitrary JSON; `JSON.stringify(metadata).length` max 4096 (JavaScript string length, UTF-16 code units) |
 | `remaining` | `number`                    | no       | Finite-use counter                                            |
 | `expiresAt` | `number`                    | no       | Expiry timestamp (ms)                                         |
 
@@ -73,7 +77,9 @@ does nothing and does not throw. It checks the stored status: a key past
 ### revokeByTag(ctx, { ownerId, tag })
 
 Bulk revoke all keys matching a tag. Covers `active`, `rotating`, and `disabled`
-statuses. Like `revoke()`, it checks the stored status, so a key past its expiry
+statuses; it reads every key of the owner in those statuses, so an owner with
+very many keys can hit Convex read limits. `revoked`, `expired` and `exhausted`
+keys are not counted. Like `revoke()`, it checks the stored status, so a key past its expiry
 that `validate()` has not marked `expired` yet is revoked.
 
 **Returns:** `{ revokedCount: number }`
@@ -84,6 +90,10 @@ Create a new key and put the old key in grace period. Both keys validate during
 the grace period, capped by the old key's absolute expiry. Rotation requires an
 active unlimited-use key; finite-use keys must be replaced explicitly so their
 quota cannot be duplicated. Secret material is generated server-side.
+
+The new key gets the old key's `name`, `scopes`, `tags`, `metadata`,
+`expiresAt`, `env`, type and prefix, so a later `revokeByTag` with one of those
+tags also revokes the replacement.
 
 | Param           | Type     | Default        | Description                         |
 | --------------- | -------- | -------------- | ----------------------------------- |
@@ -96,13 +106,26 @@ quota cannot be duplicated. Secret material is generated server-side.
 Return a bounded array of keys for an owner (default limit 100), with no raw
 keys or hashes. There is no cursor or continuation token.
 
+Results come in index order: `(ownerId, status)` (with `env`:
+`(ownerId, env, status)`), statuses sorted as strings (`active`, `disabled`,
+`exhausted`, `expired`, `revoked`, `rotating`), then creation time, oldest
+first within a status. A status change moves a key, so the order and the keys
+a `limit` returns change; repeating the call returns the same keys only while
+no key is created, rotated or changes status, or (for `listByTag`) has its
+tags changed.
+
 **Returns:** `KeyMetadata[]` —
 `{ keyId, name, lookupPrefix, type, env, scopes, tags, status, metadata?, remaining?, expiresAt?, createdAt, lastUsedAt? }`
 
 ### listByTag(ctx, { ownerId, tag, limit? })
 
 Return a bounded array of keys matching a tag (default limit 100). There is no
-cursor or continuation token; repeating the call does not advance a page.
+cursor or continuation token; repeating the call does not advance a page. Same
+order as `list` without `env`. It scans the owner's keys until it finds `limit`
+matches.
+
+`tag` is not validated: any string is accepted, and a tag no key can have
+matches nothing. `revokeByTag` throws `Invalid tag` for the same string.
 
 **Returns:** `KeyMetadata[]` (same shape as `list`)
 
@@ -147,6 +170,17 @@ must be finite and > 0. In this version the values are only stored: no cleanup
 job runs and `create()` does not apply `defaultExpiryMs`; pass `expiresAt` to
 `create()` to set an expiry.
 
+## Component functions
+
+The component's functions can be called directly through
+`components.apiKeys.mutations.*` (`create`, `validate`, `revoke`,
+`revokeByTag`, `rotate`, `update`, `disable`, `enable`, `configure`) and
+`components.apiKeys.queries.*` (`list`, `listByTag`, `matchStatus`,
+`getUsage`). The `ApiKeys` client is the documented interface; the direct
+calls take the same arguments, except that the direct `create` also takes
+`keyPrefix` (the client passes its `prefix`). The direct `validate` returns
+`reason: string` (see [Types](#types)).
+
 ## Types
 
 All exported from `@vllnt/convex-api-keys`.
@@ -165,6 +199,9 @@ All exported from `@vllnt/convex-api-keys`.
 | `KeyStatus`               | `"active" \| "disabled" \| "revoked" \| "rotating" \| "expired" \| "exhausted"`                                                          |
 | `RunMutationCtx`          | `{ runMutation(ref, args) }`: the `ctx` of a mutation, action or HTTP action                                                             |
 | `RunQueryCtx`             | `{ runQuery(ref, args) }`: the `ctx` of a query, mutation, action or HTTP action                                                         |
+
+The component's own `validate` mutation returns `reason: string`; the client's
+`validate()` narrows it to `ValidationFailureReason`.
 
 ## Errors
 
@@ -191,13 +228,14 @@ Status rules:
 | ------------------- | -------------------------------------------------------------------------------- |
 | `keyPrefix`         | `^[a-zA-Z0-9]+$` (no underscores), max 256 characters                            |
 | `env`               | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing), max 256 characters |
-| `ownerId` (create)  | must not be empty (`ownerId must not be empty`)                                  |
+| `ownerId` (create)  | must not be empty (`ownerId must not be empty`); no length limit                 |
 | `name`              | must not be empty, max 256 characters                                            |
-| `metadata`          | max 4096 characters of `JSON.stringify` output                                   |
-| `scopes`            | max 50 entries                                                                   |
-| `tags`              | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$`                       |
+| `metadata`          | `JSON.stringify(metadata).length` max 4096: JavaScript string length, in UTF-16 code units (the error says `bytes`) |
+| `scopes`            | max 50 entries; no length limit per entry                                        |
+| `tags`              | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$`; no length limit      |
 | `gracePeriodMs`     | min 60,000 (60s), max 2,592,000,000 (30 days); NaN rejected                      |
 | `tag` (revokeByTag) | same pattern as `tags`; empty is rejected (`Invalid tag`)                        |
+| `tag` (listByTag)   | not validated; a string no key can have matches nothing                          |
 | `remaining`         | finite integer > 0                                                               |
 | `expiresAt`         | finite timestamp in the future (NaN/Infinity rejected)                           |
 | `limit` (queries)   | positive integer (`limit must be a positive integer`)                            |

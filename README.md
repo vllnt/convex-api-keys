@@ -92,6 +92,7 @@ Full reference: [docs/API.md](./docs/API.md).
 | Export                                                                                                      | Import path                                   | What it is                                                              |
 | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------- |
 | [`ApiKeys`](./docs/API.md#apikeys-class)                                                                    | `@vllnt/convex-api-keys`                      | Client class; `new ApiKeys(components.apiKeys, config?)`                |
+| [`apiKeys.component`](./docs/API.md#apikeys-class)                                                          | property                                      | The mounted `ComponentApi` the client calls                             |
 | [`create(ctx, options)`](./docs/API.md#createctx-options)                                                   | method                                        | Mutation: new key, returns `{ keyId, key }` once                        |
 | [`validate(ctx, { key })`](./docs/API.md#validatectx--key-)                                                 | method                                        | Mutation: check a key, count one use, return `ValidationResult`         |
 | [`matchStatus(ctx, { key })`](./docs/API.md#matchstatusctx--key-)                                           | method                                        | Query: stored status or `null`; writes nothing                          |
@@ -121,6 +122,8 @@ Full reference: [docs/API.md](./docs/API.md).
 | [`register(t, name?)`](./docs/API.md#package-exports)                                                       | `@vllnt/convex-api-keys/test`                 | Mount the component in `convex-test`                                    |
 | [default export](./docs/API.md#package-exports)                                                             | `@vllnt/convex-api-keys/test`                 | `{ register, schema, modules }`                                         |
 | [`ComponentApi`](./docs/API.md#package-exports)                                                             | `@vllnt/convex-api-keys/_generated/component` | Type of `components.apiKeys`                                            |
+| [`package.json`](./docs/API.md#package-exports)                                                             | `@vllnt/convex-api-keys/package.json`         | The package manifest (for tools that read the version)                  |
+| [Component functions](./docs/API.md#component-functions)                                                    | `components.apiKeys.mutations.*` / `queries.*` | Call directly from your Convex functions; the client is the documented interface |
 
 ## Common tasks
 
@@ -198,6 +201,8 @@ export const listKeys = query({
     await apiKeys.list(ctx, { ownerId: await ownerOf(ctx), status: "active" }),
 });
 
+// Keys with `remaining` (like createLimitedKey's) cannot be rotated:
+// rotate throws `cannot rotate finite-use keys`.
 export const rotateKey = mutation({
   args: { keyId: v.string() },
   handler: async (ctx, { keyId }) =>
@@ -298,7 +303,7 @@ not `ConvexError`s (see
 | `Invalid tag "<tag>": must be alphanumeric with hyphens, starting with alphanumeric`          | A tag (or `revokeByTag`'s `tag`) is empty or has other characters          | Use letters, digits and `-`, starting with a letter or digit         |
 | `tags must have <= 20 entries (got <n>)`                                                      | More than 20 tags                                                          | Pass at most 20                                                      |
 | `scopes must have <= 50 entries (got <n>)`                                                    | More than 50 scopes                                                        | Pass at most 50                                                      |
-| `metadata must be <= 4096 bytes (got <n>)`                                                    | `JSON.stringify(metadata)` is longer than 4096 characters                  | Store less, or keep a reference to your own table                    |
+| `metadata must be <= 4096 bytes (got <n>)`                                                    | `JSON.stringify(metadata).length` is over 4096 (JavaScript string length, in UTF-16 code units; the message says bytes) | Store less, or keep a reference to your own table                    |
 | `expiresAt must be in the future (finite timestamp)`                                          | `expiresAt` is in the past, `NaN` or `Infinity`                            | Pass a future `Date.now()`-style timestamp in ms                     |
 | `remaining must be > 0 (finite integer)`                                                      | `remaining` is 0, negative, fractional, `NaN` or `Infinity`                | Pass a positive integer, or leave it out for unlimited use           |
 | `limit must be a positive integer`                                                            | `list` / `listByTag` got `limit` ≤ 0, fractional, `NaN` or `Infinity`    | Pass a positive integer, or leave it out (default 100)               |
@@ -320,8 +325,9 @@ not `ConvexError`s (see
   is stored; a lost key cannot be recovered.
 - Defaults: `prefix` `"vk"`, `type` `"secret"`, `env` `"live"`, `gracePeriodMs`
   1 hour, `limit` 100.
-- Limits: `name`, `prefix` and `env` 256 characters; `metadata` 4096 characters
-  of JSON; 50 `scopes`; 20 `tags`; `gracePeriodMs` 60 seconds to 30 days.
+- Limits: `name`, `prefix` and `env` 256 characters; `metadata` 4096 of
+  `JSON.stringify(metadata).length` (JavaScript string length, in UTF-16 code
+  units); 50 `scopes`; 20 `tags`; `gracePeriodMs` 60 seconds to 30 days.
 - Key format: `{prefix}_{secret|pub}_{env}_{8 chars}_{64 chars}`. Keys are
   generated with a hex secret, but parsing checks only the secret's length: a
   64-character secret that is not hex returns `not_found`. `prefix` and `env` cannot
@@ -338,10 +344,27 @@ not `ConvexError`s (see
 - `configure` only stores `cleanupIntervalMs` and `defaultExpiryMs`. No cleanup
   job runs and `create` does not apply `defaultExpiryMs`; pass `expiresAt`
   instead.
-- `list` and `listByTag` return at most `limit` keys and have no cursor; calling
-  again returns the same keys.
+- `list` and `listByTag` return at most `limit` keys and have no cursor.
+  Results come in index order: `(ownerId, status)` (with `env`:
+  `(ownerId, env, status)`), statuses sorted as strings (`active`, `disabled`,
+  `exhausted`, `expired`, `revoked`, `rotating`), then creation time, oldest
+  first within a status. When a key's status changes, the order changes and so
+  do the keys a `limit` returns; calling again returns the same keys only while
+  no key is created, rotated or changes status, or (for `listByTag`) has its
+  tags changed.
+- `listByTag` does not check `tag`: any string is accepted, and a tag that
+  could never be stored simply matches nothing. `revokeByTag` throws
+  `Invalid tag` for the same string.
 - Rotation only works on `active` keys without `remaining` that are not past
   `expiresAt`.
+- `rotate` copies `name`, `scopes`, `tags`, `metadata`, `expiresAt`, `env`, type
+  and prefix to the new key, so a later `revokeByTag` also revokes the
+  replacement.
+- Read limits: `revokeByTag` reads every `active`, `rotating` and `disabled` key
+  of the owner, and `listByTag` reads the owner's keys until it finds `limit`
+  matches. An owner with very many keys can hit Convex transaction read limits.
+- There is no length limit on each `scopes` entry, each `tags` entry (beyond
+  the tag pattern) or `ownerId`.
 - The component has no rate limiting and does not enforce scopes: `validate`
   returns `scopes`, and your code decides.
 - `ownerId` is an opaque string you pass in. The component checks that it
@@ -357,14 +380,17 @@ not `ConvexError`s (see
   runtime.
 - `@vllnt/convex-api-keys/test` is TypeScript source that needs `convex-test`,
   `vitest` with Vite's `import.meta.glob`, and `@convex-dev/sharded-counter`.
-- ESM only. `engines.node`: `>=18`.
+- ESM only. `engines.node`: `>=20`, the same as the lowest supported `convex`
+  (1.45.0).
 
 ## Testing
 
 `@vllnt/convex-api-keys/test` exports `register(t, name = "apiKeys")` to mount
 the component in a `convex-test` instance. It needs `convex-test`, `vitest`
 (with Vite's `import.meta.glob`) and `@convex-dev/sharded-counter` (for its
-`/test` helper) installed in the consuming app:
+`/test` helper) installed in the consuming app. Under pnpm, also add `vite` as
+a direct devDependency: `/// <reference types="vite/client" />` needs it, and
+`tsc` fails with `TS2688` (cannot find type definition file) without it.
 
 ```ts
 // convex/keys.test.ts
