@@ -1,5 +1,8 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["src/shared.ts", "src/client/**/*", "src/test.ts", "src/test.test.ts"],
-  "exclude": ["node_modules", "dist", "src/component/**/*"]
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["src/**/*", "example/convex/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

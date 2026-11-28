@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { expect, test, describe, vi, beforeEach, afterEach } from "vitest";
+import { assert, expect, test, describe, vi, beforeEach, afterEach } from "vitest";
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api.js";
 import testSupport, { register } from "../../src/test.js";
@@ -118,7 +118,7 @@ describe("validate", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: created.key,
     });
-    expect(result.valid).toBe(true);
+    assert(result.valid);
     expect(result.ownerId).toBe("org_1");
     expect(result.scopes).toEqual(["read"]);
     expect(result.tags).toEqual(["test"]);
@@ -132,8 +132,7 @@ describe("validate", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: "not_a_valid_key",
     });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("malformed");
+    expect(result).toEqual({ valid: false, reason: "malformed" });
   });
 
   test("rejects malformed key (bad type segment)", async () => {
@@ -141,8 +140,7 @@ describe("validate", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: "pre_badtype_live_12345678_" + "a".repeat(64),
     });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("malformed");
+    expect(result).toEqual({ valid: false, reason: "malformed" });
   });
 
   test("rejects malformed key (wrong lookupPrefix length)", async () => {
@@ -150,8 +148,7 @@ describe("validate", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: "pre_secret_live_short_" + "a".repeat(64),
     });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("malformed");
+    expect(result).toEqual({ valid: false, reason: "malformed" });
   });
 
   test("rejects malformed key (wrong secret length)", async () => {
@@ -159,8 +156,7 @@ describe("validate", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: "pre_secret_live_12345678_tooshort",
     });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("malformed");
+    expect(result).toEqual({ valid: false, reason: "malformed" });
   });
 
   test("rejects key with unknown lookupPrefix (not_found)", async () => {
@@ -168,8 +164,7 @@ describe("validate", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: "myapp_secret_live_zzzzzzzz_" + "f".repeat(64),
     });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("not_found");
+    expect(result).toEqual({ valid: false, reason: "not_found" });
   });
 
   test("rejects key with correct lookupPrefix but wrong hash (not_found)", async () => {
@@ -182,8 +177,7 @@ describe("validate", () => {
     const parts = created.key.split("_");
     const fakeKey = [parts[0], parts[1], parts[2], parts[3], "b".repeat(64)].join("_");
     const result = await t.mutation(api.example.validateKey, { key: fakeKey });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("not_found");
+    expect(result).toEqual({ valid: false, reason: "not_found" });
   });
 
   test("rejects revoked key", async () => {
@@ -196,8 +190,7 @@ describe("validate", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: created.key,
     });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("revoked");
+    expect(result).toEqual({ valid: false, reason: "revoked" });
   });
 
   test("rejects disabled key", async () => {
@@ -210,8 +203,7 @@ describe("validate", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: created.key,
     });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("disabled");
+    expect(result).toEqual({ valid: false, reason: "disabled" });
   });
 });
 
@@ -238,8 +230,7 @@ describe("expiry", () => {
     vi.advanceTimersByTime(HOUR + 1);
 
     result = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("expired");
+    expect(result).toEqual({ valid: false, reason: "expired" });
   });
 
   test("grace period expiry after rotation", async () => {
@@ -262,13 +253,11 @@ describe("expiry", () => {
     vi.advanceTimersByTime(HOUR + 1);
 
     result = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("expired");
+    expect(result).toEqual({ valid: false, reason: "expired" });
 
     // Persisted terminal state must remain terminal on every later validation.
     result = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("expired");
+    expect(result).toEqual({ valid: false, reason: "expired" });
   });
 });
 
@@ -284,21 +273,20 @@ describe("finite-use keys", () => {
     });
 
     const r1 = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(r1.valid).toBe(true);
+    assert(r1.valid);
     expect(r1.remaining).toBe(2);
 
     const r2 = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(r2.valid).toBe(true);
+    assert(r2.valid);
     expect(r2.remaining).toBe(1);
 
     const r3 = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(r3.valid).toBe(true);
+    assert(r3.valid);
     expect(r3.remaining).toBe(0);
 
     // 4th use: exhausted
     const r4 = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(r4.valid).toBe(false);
-    expect(r4.reason).toBe("exhausted");
+    expect(r4).toEqual({ valid: false, reason: "exhausted" });
   });
 
   test("one-time token exhausts after single use", async () => {
@@ -310,12 +298,11 @@ describe("finite-use keys", () => {
     });
 
     const r1 = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(r1.valid).toBe(true);
+    assert(r1.valid);
     expect(r1.remaining).toBe(0);
 
     const r2 = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(r2.valid).toBe(false);
-    expect(r2.reason).toBe("exhausted");
+    expect(r2).toEqual({ valid: false, reason: "exhausted" });
   });
 });
 
@@ -331,8 +318,7 @@ describe("disable / enable", () => {
 
     await t.mutation(api.example.disableKey, { keyId: created.keyId, ownerId: "org_1" });
     let result = await t.mutation(api.example.validateKey, { key: created.key });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("disabled");
+    expect(result).toEqual({ valid: false, reason: "disabled" });
 
     await t.mutation(api.example.enableKey, { keyId: created.keyId, ownerId: "org_1" });
     result = await t.mutation(api.example.validateKey, { key: created.key });
@@ -408,10 +394,10 @@ describe("update", () => {
 
     const keys = await t.query(api.example.listKeys, { ownerId: "org_1" });
     const key = keys.find((k: { keyId: string }) => k.keyId === created.keyId);
-    expect(key.name).toBe("Renamed");
-    expect(key.scopes).toEqual(["read", "write"]);
-    expect(key.tags).toEqual(["v2"]);
-    expect(key.metadata).toEqual({ updated: true });
+    expect(key?.name).toBe("Renamed");
+    expect(key?.scopes).toEqual(["read", "write"]);
+    expect(key?.tags).toEqual(["v2"]);
+    expect(key?.metadata).toEqual({ updated: true });
   });
 
   test("update with no changes is a no-op", async () => {
@@ -509,7 +495,7 @@ describe("revokeByTag", () => {
       status: "active",
     });
     expect(active.length).toBe(1);
-    expect(active[0].tags).toEqual(["safe"]);
+    expect(active[0]?.tags).toEqual(["safe"]);
   });
 
   test("revokeByTag with no matches returns 0", async () => {
@@ -739,7 +725,7 @@ describe("list", () => {
       env: "live",
     });
     expect(live.length).toBe(1);
-    expect(live[0].env).toBe("live");
+    expect(live[0]?.env).toBe("live");
   });
 
   test("filters by env and status", async () => {
@@ -805,7 +791,7 @@ describe("listByTag", () => {
       tag: "sdk",
     });
     expect(sdkKeys.length).toBe(1);
-    expect(sdkKeys[0].name).toBe("SDK Key");
+    expect(sdkKeys[0]?.name).toBe("SDK Key");
   });
 });
 
@@ -868,8 +854,7 @@ describe("parseKeyString edge cases", () => {
     const result = await t.mutation(api.example.validateKey, {
       key: "pre__live_12345678_" + "a".repeat(64),
     });
-    expect(result.valid).toBe(false);
-    expect(result.reason).toBe("malformed");
+    expect(result).toEqual({ valid: false, reason: "malformed" });
   });
 });
 

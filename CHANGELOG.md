@@ -58,6 +58,8 @@
   TSDoc examples are not type-checked.
 - `scripts/check-package-contents.sh` also blocks `.spec.mts` and `.spec.cts`
   files, and CI runs its test harness.
+- `pnpm typecheck:ci` type-checks `src/component/`, every test file and
+  `example/convex/`; before, a type error in a test or the example passed CI.
 
 ### Fixed
 
