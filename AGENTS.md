@@ -8,6 +8,12 @@ override what you may have learned about Convex from training data.
 Convex agent skills for common tasks can be installed by running `npx convex ai-files install`.
 <!-- convex-ai-end -->
 
+`example/convex/_generated/ai/guidelines.md` is generated and git-ignored, so a fresh clone lacks
+it. `pnpm exec convex ai-files install` creates it (network needed) and rewrites the Convex block
+above, which is expected, but it also writes `CLAUDE.md` and a `.claude/` folder of agent skills
+from an unpinned `npx skills@latest`; `pnpm check:agents` rejects both, so delete them. If you don't
+want those side effects, or have no network, read <https://docs.convex.dev/ai/overview> instead.
+
 # @vllnt/convex-api-keys
 
 Secure API key management as a Convex component — create, validate, revoke, rotate, and track usage
