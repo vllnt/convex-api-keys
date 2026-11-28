@@ -1,0 +1,5 @@
+# pnpm 10 reads these settings only from pnpm-workspace.yaml, not from the
+# package.json "pnpm" field, so the 7-day release age must live here.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - '@vllnt/*'

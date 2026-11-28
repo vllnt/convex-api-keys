@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -180,10 +180,12 @@ try {
       typescript: pin("@typescript/native"),
       vite: pin("vite"),
     },
-    // Same release-age, override and build-script policy as the repo.
+    // Same override and build-script policy as the repo.
     pnpm: pkg.pnpm,
   };
   writeFileSync(join(dir, "package.json"), JSON.stringify(manifest, null, 2));
+  // Same release-age policy: pnpm 10 reads it only from pnpm-workspace.yaml.
+  copyFileSync(join(ROOT, "pnpm-workspace.yaml"), join(dir, "pnpm-workspace.yaml"));
   execFileSync("pnpm", ["install", "--no-frozen-lockfile", "--reporter=silent"], {
     cwd: dir,
     stdio: "inherit",
