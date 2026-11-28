@@ -56,6 +56,8 @@
   there are none); when `llms.txt` does not end with the Ecosystem block; and
   when a `docs/API.md` TypeScript example does not type-check. CHANGELOG and
   TSDoc examples are not type-checked.
+- `scripts/check-package-contents.sh` also blocks `.spec.mts` and `.spec.cts`
+  files, and CI runs its test harness.
 
 ### Fixed
 

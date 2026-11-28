@@ -105,9 +105,9 @@ fi
 is_denied_class() {
   local p="$1" base="${1##*/}"
   case "$base" in
-    *.test.ts|*.test.tsx|*.test.js|*.test.mjs|*.test.cjs|*.test.mts|*.test.cts|*.test.jsx)
+    *.test.ts|*.test.tsx|*.test.js|*.test.jsx|*.test.mjs|*.test.cjs|*.test.mts|*.test.cts)
       return 0 ;;
-    *.spec.ts|*.spec.tsx|*.spec.js|*.spec.mjs|*.spec.cjs|*.spec.jsx)
+    *.spec.ts|*.spec.tsx|*.spec.js|*.spec.jsx|*.spec.mjs|*.spec.cjs|*.spec.mts|*.spec.cts)
       return 0 ;;
     .env|.env.*)
       return 0 ;;
