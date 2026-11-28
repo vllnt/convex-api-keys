@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 import { assert, expect, test, describe, vi, beforeEach, afterEach } from "vitest";
 import { convexTest } from "convex-test";
-import { api } from "./_generated/api.js";
+import { api, components } from "./_generated/api.js";
+import { ApiKeys } from "../../src/client/index.js";
 import testSupport, { register } from "../../src/test.js";
 import shardedCounterTest from "@convex-dev/sharded-counter/test";
 
@@ -96,11 +97,33 @@ describe("create", () => {
 
 // ─── not found errors ────────────────────────────────────────────
 
-// Note: "key not found" branches in revoke/enable/disable/getUsage/update/rotate
-// require passing a valid Convex doc ID that doesn't exist in the DB.
-// In convex-test, component DBs are isolated and we can't fabricate orphaned IDs
-// through the client API. These 6 lines (~5 total uncovered) are defensive guards
-// that protect against data corruption — not reachable through normal API usage.
+// The "key not found" branches of revoke/rotate/update/disable/enable/getUsage
+// need an id whose row is gone; src/component/component.test.ts covers them
+// ("orphaned key identifiers").
+
+// ─── test helper and client config ──────────────────────────────
+
+describe("test helper and client config", () => {
+  test("register(t) mounts the component as apiKeys by default", async () => {
+    const t = convexTest(undefined!, modules);
+    register(t);
+    shardedCounterTest.register(t, "apiKeys/shardedCounter");
+    expect(
+      await t.run((ctx) => ctx.runQuery(components.apiKeys.queries.list, { ownerId: "org_1" })),
+    ).toEqual([]);
+    expect(await t.query(api.example.listKeys, { ownerId: "org_1" })).toEqual([]);
+  });
+
+  test("a client prefix with an underscore makes create throw Invalid keyPrefix", async () => {
+    const t = setup();
+    const client = new ApiKeys(components.apiKeys, { prefix: "a_b" });
+    await expect(
+      t.run((ctx) => client.create(ctx, { name: "k", ownerId: "org_1" })),
+    ).rejects.toThrow(
+      'Invalid keyPrefix "a_b": must match ^[a-zA-Z0-9]+$ (alphanumeric only, no underscores)',
+    );
+  });
+});
 
 // ─── validate ────────────────────────────────────────────────────
 
