@@ -303,7 +303,7 @@ not `ConvexError`s (see
 | `Invalid tag "<tag>": must be alphanumeric with hyphens, starting with alphanumeric`          | A tag (or `revokeByTag`'s `tag`) is empty or has other characters          | Use letters, digits and `-`, starting with a letter or digit         |
 | `tags must have <= 20 entries (got <n>)`                                                      | More than 20 tags                                                          | Pass at most 20                                                      |
 | `scopes must have <= 50 entries (got <n>)`                                                    | More than 50 scopes                                                        | Pass at most 50                                                      |
-| `metadata must be <= 4096 bytes (got <n>)`                                                    | `JSON.stringify(metadata)` is longer than 4096 characters (the message says bytes; characters are counted) | Store less, or keep a reference to your own table                    |
+| `metadata must be <= 4096 bytes (got <n>)`                                                    | `JSON.stringify(metadata).length` is over 4096 (JavaScript string length, in UTF-16 code units; the message says bytes) | Store less, or keep a reference to your own table                    |
 | `expiresAt must be in the future (finite timestamp)`                                          | `expiresAt` is in the past, `NaN` or `Infinity`                            | Pass a future `Date.now()`-style timestamp in ms                     |
 | `remaining must be > 0 (finite integer)`                                                      | `remaining` is 0, negative, fractional, `NaN` or `Infinity`                | Pass a positive integer, or leave it out for unlimited use           |
 | `limit must be a positive integer`                                                            | `list` / `listByTag` got `limit` ≤ 0, fractional, `NaN` or `Infinity`    | Pass a positive integer, or leave it out (default 100)               |
@@ -325,8 +325,9 @@ not `ConvexError`s (see
   is stored; a lost key cannot be recovered.
 - Defaults: `prefix` `"vk"`, `type` `"secret"`, `env` `"live"`, `gracePeriodMs`
   1 hour, `limit` 100.
-- Limits: `name`, `prefix` and `env` 256 characters; `metadata` 4096 characters
-  of JSON; 50 `scopes`; 20 `tags`; `gracePeriodMs` 60 seconds to 30 days.
+- Limits: `name`, `prefix` and `env` 256 characters; `metadata` 4096 of
+  `JSON.stringify(metadata).length` (JavaScript string length, in UTF-16 code
+  units); 50 `scopes`; 20 `tags`; `gracePeriodMs` 60 seconds to 30 days.
 - Key format: `{prefix}_{secret|pub}_{env}_{8 chars}_{64 chars}`. Keys are
   generated with a hex secret, but parsing checks only the secret's length: a
   64-character secret that is not hex returns `not_found`. `prefix` and `env` cannot
@@ -345,10 +346,12 @@ not `ConvexError`s (see
   instead.
 - `list` and `listByTag` return at most `limit` keys and have no cursor.
   Results come in index order: `(ownerId, status)` (with `env`:
-  `(ownerId, env, status)`), statuses sorted as strings, then creation time,
-  oldest first within a status. When a key's status changes, the order changes
-  and so do the keys a `limit` returns; calling again returns the same keys only
-  while no status changes.
+  `(ownerId, env, status)`), statuses sorted as strings (`active`, `disabled`,
+  `exhausted`, `expired`, `revoked`, `rotating`), then creation time, oldest
+  first within a status. When a key's status changes, the order changes and so
+  do the keys a `limit` returns; calling again returns the same keys only while
+  no key is created, rotated or changes status, or (for `listByTag`) has its
+  tags changed.
 - `listByTag` does not check `tag`: any string is accepted, and a tag that
   could never be stored simply matches nothing. `revokeByTag` throws
   `Invalid tag` for the same string.
@@ -386,8 +389,8 @@ not `ConvexError`s (see
 the component in a `convex-test` instance. It needs `convex-test`, `vitest`
 (with Vite's `import.meta.glob`) and `@convex-dev/sharded-counter` (for its
 `/test` helper) installed in the consuming app. Under pnpm, also add `vite` as
-a direct devDependency: `/// <reference types="vite/client" />` needs it, and a
-strict `tsc` fails with `TS2688` (cannot find type definition file) without it.
+a direct devDependency: `/// <reference types="vite/client" />` needs it, and
+`tsc` fails with `TS2688` (cannot find type definition file) without it.
 
 ```ts
 // convex/keys.test.ts

@@ -47,7 +47,7 @@ key once — only the hash is stored.
 | `scopes`    | `string[]`                  | no       | Permission scopes (max 50)                                    |
 | `tags`      | `string[]`                  | no       | Filterable tags (max 20)                                      |
 | `env`       | `string`                    | no       | Environment (default: `"live"`, must match `^[a-zA-Z0-9-]+$`) |
-| `metadata`  | `Record<string, unknown>`   | no       | Arbitrary JSON (max 4096 characters of JSON)                  |
+| `metadata`  | `Record<string, unknown>`   | no       | Arbitrary JSON; `JSON.stringify(metadata).length` max 4096 (JavaScript string length, UTF-16 code units) |
 | `remaining` | `number`                    | no       | Finite-use counter                                            |
 | `expiresAt` | `number`                    | no       | Expiry timestamp (ms)                                         |
 
@@ -107,10 +107,12 @@ Return a bounded array of keys for an owner (default limit 100), with no raw
 keys or hashes. There is no cursor or continuation token.
 
 Results come in index order: `(ownerId, status)` (with `env`:
-`(ownerId, env, status)`), statuses sorted as strings, then creation time,
-oldest first within a status. A status change moves a key, so the order and
-the keys a `limit` returns change; repeating the call returns the same keys
-only while no status changes.
+`(ownerId, env, status)`), statuses sorted as strings (`active`, `disabled`,
+`exhausted`, `expired`, `revoked`, `rotating`), then creation time, oldest
+first within a status. A status change moves a key, so the order and the keys
+a `limit` returns change; repeating the call returns the same keys only while
+no key is created, rotated or changes status, or (for `listByTag`) has its
+tags changed.
 
 **Returns:** `KeyMetadata[]` —
 `{ keyId, name, lookupPrefix, type, env, scopes, tags, status, metadata?, remaining?, expiresAt?, createdAt, lastUsedAt? }`
@@ -228,7 +230,7 @@ Status rules:
 | `env`               | `^[a-zA-Z0-9-]+$` (no underscores — would break key parsing), max 256 characters |
 | `ownerId` (create)  | must not be empty (`ownerId must not be empty`); no length limit                 |
 | `name`              | must not be empty, max 256 characters                                            |
-| `metadata`          | max 4096 characters of `JSON.stringify` output (the error says `bytes`)          |
+| `metadata`          | `JSON.stringify(metadata).length` max 4096: JavaScript string length, in UTF-16 code units (the error says `bytes`) |
 | `scopes`            | max 50 entries; no length limit per entry                                        |
 | `tags`              | max 20 entries, each matching `^[a-zA-Z0-9][a-zA-Z0-9-]*$`; no length limit      |
 | `gracePeriodMs`     | min 60,000 (60s), max 2,592,000,000 (30 days); NaN rejected                      |

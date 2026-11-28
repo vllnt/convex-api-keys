@@ -7,22 +7,16 @@
 - The npm package now ships `docs/API.md`, `CHANGELOG.md` and `llms.txt`, so
   coding agents can read docs that match the installed version from
   `node_modules/@vllnt/convex-api-keys/`. `llms.txt` links shipped files by
-  relative path. `pnpm test:package` (run by `pnpm test` and
-  `pnpm test:coverage`) fails when one of them is missing from the tarball.
+  relative path.
 - `docs/API.md` documents the package entry points and exported types.
 - Every public export and `ApiKeys` method has a TSDoc summary, shipped in the
   `.d.ts` files; `ApiKeys` links its package page with `@see`.
-- `pnpm test:package` runs `scripts/check-docs.mjs`. It fails when a README
-  section is missing or out of order, a code block has no language, a relative
-  link or anchor breaks, an export or error message is undocumented, a README
-  or `docs/API.md` TypeScript example does not type-check against the built
-  package, or the vllnt footer, `llms.txt` ecosystem block or package metadata
-  drift.
 
 ### Changed
 
-- **`engines.node` is now `>=20`**, matching the lowest supported `convex`
-  (1.45.0, which declares `node >=20.0.0`). Node 18 users must upgrade.
+- **Breaking: `engines.node` is now `>=20`**, matching the lowest supported
+  `convex` (1.45.0, which declares `node >=20.0.0`). Node 18 users must
+  upgrade.
 - **Behaviour change: `revoke()` keeps a final status final.** On a key whose
   stored status is `expired` or `exhausted` it now does nothing, as it already
   did for a `revoked` key: the status and `revokedAt` stay as they are and no
@@ -46,29 +40,13 @@
 - README Related packages lists only packages this one uses in code; it is now
   "None.".
 - The `llms.txt` Ecosystem block links the release feed and package search.
-- `scripts/check-docs.mjs` also fails when the `package.json` description is
-  not one sentence naming Convex, or is not both the first line after the
-  README title and the first line after the `llms.txt` title (as `> `); when
-  the README Links section differs from the standard list, is not directly
-  before License, or License is not the last section; when Related packages
-  does not list exactly the `@vllnt` packages in `dependencies`,
-  `peerDependencies` or imports in `src/` and `example/` (one "None." line when
-  there are none); when `llms.txt` does not end with the Ecosystem block; and
-  when a `docs/API.md` TypeScript example does not type-check. CHANGELOG and
-  TSDoc examples are not type-checked.
-- `pnpm test:package` runs `scripts/test-consumer.mjs`. It packs the tarball
-  and installs it with pnpm in a clean project outside the repo. Node imports
-  and runs only `.` and reads `./package.json`. It resolves `./convex.config`
-  and `./convex.config.js` without running them, because they only run inside
-  the Convex CLI. The other entry points are type-checked: a `strict` consumer
-  imports every entry point and calls `ApiKeys` from a mutation, a query, an
-  action and an HTTP action. The test fails when an `exports` subpath is not
-  covered, and runs in CI's Test job and before every publish.
-- `pnpm typecheck:ci` type-checks `src/component/`, every test file and
-  `example/convex/`; before, a type error in a test or the example passed CI.
+- Docs: `list()` and `listByTag()` never had a cursor; they return at most
+  `limit` keys (default 100). The 0.2.0 entry called this pagination. The
+  0.2.0 `ownerId` check covers the key-level admin calls only; `configure`
+  takes no `ownerId`.
 - The README and `docs/API.md` document that `list` and `listByTag` return keys
   in index order (status, then creation time), so the order and which keys a
-  `limit` returns change when a key's status changes.
+  `limit` returns change when a key is created, rotated or changes status.
 - They document that `rotate` copies `name`, `scopes`, `tags`, `metadata`,
   `expiresAt`, `env`, type and prefix to the new key, so a later `revokeByTag`
   also revokes the replacement; and that keys with `remaining` cannot be
@@ -80,29 +58,30 @@
   matches, so an owner with very many keys can hit Convex read limits; and
   that `scopes` entries, `tags` entries and `ownerId` have no length limit.
 - The README Testing section says `vite` must be a direct devDependency under
-  pnpm for `/// <reference types="vite/client" />`; strict `tsc` fails with
-  `TS2688` otherwise.
-- The docs describe `metadata`'s limit as 4096 characters of JSON (the error
-  message still says bytes), the `ApiKeys.component` property, the
-  `./package.json` export, calling component functions directly, and that the
-  component's own `validate` returns `reason: string`.
-- Internal: tests cover every documented API behaviour.
+  pnpm for `/// <reference types="vite/client" />`; `tsc` fails with `TS2688`
+  otherwise.
+- The docs describe `metadata`'s limit as 4096 of the JSON's JavaScript string
+  length (UTF-16 code units; the error message still says bytes), the
+  `ApiKeys.component` property, the `./package.json` export, calling component
+  functions directly, and that the component's own `validate` returns
+  `reason: string`.
+- Internal: a docs check (`scripts/check-docs.mjs`), a packed-tarball consumer
+  test (`scripts/test-consumer.mjs`), a tarball check that the shipped docs are
+  present and that `npm pkg fix` would rewrite no field, CI type-checking of
+  tests and `example/convex/`, `.spec.mts`/`.spec.cts` blocking in the
+  package-contents check, the 7-day dependency release age moved to
+  `pnpm-workspace.yaml` (Renovate matches it), and tests for every documented
+  API behaviour.
 
 ### Fixed
 
-- `scripts/check-package-contents.sh` also blocks `.spec.mts` and `.spec.cts`
-  files, and CI runs its test harness.
 - `package.json` `repository.url` uses the form npm expects, so publishing no
-  longer prints an auto-correction warning. `pnpm test:package` fails when
-  `npm pkg fix` would rewrite any field.
+  longer prints an auto-correction warning.
 - `RunMutationCtx` and `RunQueryCtx` accept action and HTTP action contexts.
   They were `Pick`s of the mutation and query context types, which an action
   `ctx` does not satisfy, so calling `ApiKeys` methods from an action or HTTP
   action failed to type-check. They are now interfaces with only the
   `runMutation` / `runQuery` call, for public and internal function references.
-- The 7-day minimum release age now lives in `pnpm-workspace.yaml`, where
-  pnpm 10 reads it; pnpm ignored it in the `package.json` `pnpm` field.
-  Renovate uses the same rule, with `@vllnt` packages exempt.
 
 ## [0.3.0] - 2026-11-26
 
@@ -169,8 +148,7 @@
   from return type.
 - **`validate()`**: `retryAfter` removed from failure response (no internal rate
   limiting).
-- **`list()` / `listByTag()`**: Now return at most `limit` keys (default 100).
-  There is no cursor.
+- **`list()` / `listByTag()`**: Now paginated with `limit` param (default 100).
 
 ### Migration Guide
 
@@ -219,9 +197,7 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 - Public client wrapper now forwards optional `limit` to `list()` and
   `listByTag()`
 - `ValidationFailure` no longer advertises the removed `retryAfter` field
-- Auth boundary: `ownerId` cross-check on every key-level admin call
-  (`revoke`, `rotate`, `update`, `disable`, `enable`, `getUsage`); `configure`
-  takes no `ownerId`
+- Auth boundary: `ownerId` cross-check on all admin mutations
 - Server-side secret generation for `create()` and `rotate()`
 - Input validation: keyPrefix charset, env charset, gracePeriodMs bounds
   (60s–30d), metadata size (4KB), scopes (50), tags (20)
@@ -230,7 +206,7 @@ shardedCounterTest.register(t, "apiKeys/shardedCounter");
 - lastUsedAt throttled to 60s (reduces OCC contention)
 - Remaining decrement decoupled from lastUsedAt write (single merged patch)
 - revokeByTag expanded to include `rotating` and `disabled` statuses
-- `list`/`listByTag` return at most `limit` keys (default 100), with no cursor
+- Paginated list/listByTag with configurable limit
 
 ## 0.1.1
 

@@ -485,7 +485,7 @@ describe("documented API behaviour", () => {
       ).toMatchObject({ oldKeyExpiresAt: now + 5 * MINUTE_MS });
     });
 
-    test("copies name, scopes, tags, metadata, expiresAt and prefix to the new key", async () => {
+    test("copies name, scopes, tags, metadata, expiresAt, prefix, env and type to the new key", async () => {
       const { t, create, row, owned } = setup();
       const fields = {
         name: "billing",
@@ -495,10 +495,11 @@ describe("documented API behaviour", () => {
         expiresAt: NOW + 10 * HOUR_MS,
         keyPrefix: "acme",
         env: "test",
+        type: "publishable" as const,
       };
       const created = await create(fields);
       const rotated = await t.mutation(api.mutations.rotate, owned(created.keyId));
-      expect(rotated.newKey).toMatch(/^acme_secret_test_[0-9a-f]{8}_[0-9a-f]{64}$/u);
+      expect(rotated.newKey).toMatch(/^acme_pub_test_[0-9a-f]{8}_[0-9a-f]{64}$/u);
       expect(await row(rotated.newKeyId)).toMatchObject({ ...fields, status: "active" });
     });
 
@@ -525,6 +526,25 @@ describe("documented API behaviour", () => {
         createdAt: stored?._creationTime,
         lookupPrefix: stored?.lookupPrefix,
       });
+    });
+
+    test("orders keys by status as strings, then oldest first within a status", async () => {
+      const { t, create, owned } = setup();
+      const revoked = await create({ name: "revoked" });
+      const disabled = await create({ name: "disabled" });
+      const rotating = await create({ name: "rotating" });
+      const active = await create({ name: "active" });
+      await t.mutation(api.mutations.revoke, owned(revoked.keyId));
+      await t.mutation(api.mutations.disable, owned(disabled.keyId));
+      const { newKeyId } = await t.mutation(api.mutations.rotate, owned(rotating.keyId));
+      const ids = (await t.query(api.queries.list, { ownerId: OWNER })).map((k) => k.keyId);
+      expect(ids).toEqual([active.keyId, newKeyId, disabled.keyId, revoked.keyId, rotating.keyId]);
+    });
+
+    test("listByTag with a tag that fails the tag pattern returns []", async () => {
+      const { t, create } = setup();
+      await create({ tags: ["x"] });
+      expect(await t.query(api.queries.listByTag, { ownerId: OWNER, tag: "-x" })).toEqual([]);
     });
 
     test("returns 100 keys by default when the owner has 101", async () => {
