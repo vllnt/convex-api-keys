@@ -42,7 +42,7 @@
 - The README intro is the `package.json` `description`, the same sentence as
   the `llms.txt` summary.
 - The README has a Links section (docs, release feed, package search, source,
-  community, author, sponsor) that replaces the Author section.
+  issues and npm, community, author, sponsor) that replaces the Author section.
 - README Related packages lists only packages this one uses in code; it is now
   "None.".
 - The `llms.txt` Ecosystem block links the release feed and package search.
