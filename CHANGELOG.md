@@ -1,8 +1,6 @@
 # Changelog
 
-## [Unreleased]
-
-## [0.4.0] - 2026-11-27
+## [0.4.0] - 2026-11-28
 
 ### Added
 
@@ -23,6 +21,8 @@
 
 ### Changed
 
+- **`engines.node` is now `>=20`**, matching the lowest supported `convex`
+  (1.45.0, which declares `node >=20.0.0`). Node 18 users must upgrade.
 - **Behaviour change: `revoke()` keeps a final status final.** On a key whose
   stored status is `expired` or `exhausted` it now does nothing, as it already
   did for a `revoked` key: the status and `revokedAt` stay as they are and no
@@ -66,6 +66,27 @@
   covered, and runs in CI's Test job and before every publish.
 - `pnpm typecheck:ci` type-checks `src/component/`, every test file and
   `example/convex/`; before, a type error in a test or the example passed CI.
+- The README and `docs/API.md` document that `list` and `listByTag` return keys
+  in index order (status, then creation time), so the order and which keys a
+  `limit` returns change when a key's status changes.
+- They document that `rotate` copies `name`, `scopes`, `tags`, `metadata`,
+  `expiresAt`, `env`, type and prefix to the new key, so a later `revokeByTag`
+  also revokes the replacement; and that keys with `remaining` cannot be
+  rotated.
+- They document that `listByTag` accepts any `tag` (an invalid one matches
+  nothing) while `revokeByTag` throws `Invalid tag`.
+- They document read limits: `revokeByTag` reads every active, rotating and
+  disabled key of the owner and `listByTag` scans until it finds `limit`
+  matches, so an owner with very many keys can hit Convex read limits; and
+  that `scopes` entries, `tags` entries and `ownerId` have no length limit.
+- The README Testing section says `vite` must be a direct devDependency under
+  pnpm for `/// <reference types="vite/client" />`; strict `tsc` fails with
+  `TS2688` otherwise.
+- The docs describe `metadata`'s limit as 4096 characters of JSON (the error
+  message still says bytes), the `ApiKeys.component` property, the
+  `./package.json` export, calling component functions directly, and that the
+  component's own `validate` returns `reason: string`.
+- Internal: tests cover every documented API behaviour.
 
 ### Fixed
 

@@ -377,7 +377,8 @@ not `ConvexError`s (see
   runtime.
 - `@vllnt/convex-api-keys/test` is TypeScript source that needs `convex-test`,
   `vitest` with Vite's `import.meta.glob`, and `@convex-dev/sharded-counter`.
-- ESM only. `engines.node`: `>=18`.
+- ESM only. `engines.node`: `>=20`, the same as the lowest supported `convex`
+  (1.45.0).
 
 ## Testing
 
