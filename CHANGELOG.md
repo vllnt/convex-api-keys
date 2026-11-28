@@ -79,6 +79,9 @@
   `ctx` does not satisfy, so calling `ApiKeys` methods from an action or HTTP
   action failed to type-check. They are now interfaces with only the
   `runMutation` / `runQuery` call, for public and internal function references.
+- The 7-day minimum release age now lives in `pnpm-workspace.yaml`, where
+  pnpm 10 reads it; pnpm ignored it in the `package.json` `pnpm` field.
+  Renovate uses the same rule, with `@vllnt` packages exempt.
 
 ## [0.3.0] - 2026-11-26
 
