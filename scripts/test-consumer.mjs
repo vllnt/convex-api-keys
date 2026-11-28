@@ -2,13 +2,14 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Install the packed tarball in a clean pnpm project outside the repo, as a
 // consumer would, and fail when an entry point does not load or type-check.
 // Run by `pnpm test:package`, so CI's Test job and the publish quality gate
 // run it before every release. One install; no test runner.
 
-const ROOT = resolve(dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
 
 // Pin each tool to the exact version the repo's lockfile installed.
@@ -139,6 +140,22 @@ const TSCONFIG = {
   },
   include: ["consumer.ts"],
 };
+
+// Every `exports` subpath must be imported, resolved or type-checked above:
+// collect the package specifiers RUNTIME and CONSUMER use and compare.
+const specifier = new RegExp(`["']${pkg.name}(/[^"']+)?["']`, "g");
+const covered = new Set(
+  [...(RUNTIME + CONSUMER).matchAll(specifier)].map(([, sub]) => (sub ? `.${sub}` : ".")),
+);
+const exported = new Set(Object.keys(pkg.exports));
+const gaps = [
+  ...[...exported].filter((sub) => !covered.has(sub)).map((sub) => `exports subpath ${sub} is not covered`),
+  ...[...covered].filter((sub) => !exported.has(sub)).map((sub) => `${sub} is covered but not in exports`),
+];
+if (gaps.length > 0) {
+  for (const gap of gaps) console.error(`FAIL consumer: ${gap}`);
+  process.exit(1);
+}
 
 const dir = mkdtempSync(join(tmpdir(), "consumer-"));
 let step = "build";
