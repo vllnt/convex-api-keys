@@ -48,7 +48,7 @@
     "test": "pnpm check:agents && pnpm test:package && vitest run --passWithNoTests",
     "test:watch": "vitest --typecheck --clearScreen false",
     "test:coverage": "pnpm test:package && vitest run --coverage --coverage.reporter=text",
-    "test:package": "node scripts/test-package.mjs && node scripts/check-docs.mjs",
+    "test:package": "node scripts/test-package.mjs && node scripts/check-docs.mjs && node scripts/test-consumer.mjs",
     "generate:llms": "node scripts/generate-llms.mjs",
     "preversion": "pnpm install --frozen-lockfile && pnpm build && pnpm test && pnpm typecheck && pnpm generate:llms",
     "check:agents": "node -e \"const f=require('node:fs');if(!f.existsSync('AGENTS.md')||f.existsSync('CLAUDE.md')||f.existsSync('.claude'))process.exit(1)\"",

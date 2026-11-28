@@ -56,6 +56,11 @@
   there are none); when `llms.txt` does not end with the Ecosystem block; and
   when a `docs/API.md` TypeScript example does not type-check. CHANGELOG and
   TSDoc examples are not type-checked.
+- `pnpm test:package` runs `scripts/test-consumer.mjs`. It packs the tarball,
+  installs it with pnpm in a clean project outside the repo, imports the
+  runtime entry points with node and type-checks a `strict` consumer that
+  imports every entry point and calls `ApiKeys` from a mutation, a query, an
+  action and an HTTP action. It runs in CI's Test job and before every publish.
 - `scripts/check-package-contents.sh` also blocks `.spec.mts` and `.spec.cts`
   files, and CI runs its test harness.
 - `pnpm typecheck:ci` type-checks `src/component/`, every test file and
