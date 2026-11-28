@@ -1,5 +1,7 @@
 # @vllnt/convex-api-keys
 
+![API Keys — @vllnt/convex-api-keys](https://raw.githubusercontent.com/vllnt/convex-api-keys/main/.github/assets/thumbnail.png)
+
 Convex component to create, validate, revoke and rotate API keys, stored as SHA-256 hashes, with owner scoping, scopes, expiry, use limits and usage counts.
 
 ## For coding agents
