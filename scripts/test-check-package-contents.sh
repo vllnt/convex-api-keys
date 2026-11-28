@@ -87,6 +87,17 @@ commit_tree
 run "packed test file is denied" 1
 grep -q 'DENY  src/index.test.ts' <<< "$LAST_OUTPUT" || { echo "FAIL test path not denied" >&2; failures=$((failures + 1)); }
 
+# ESM and CJS TypeScript test flavours are denied too
+for flavour in spec.mts spec.cts test.mts test.cts; do
+  rm -rf "$REPO/src"
+  mkdir -p "$REPO/src"
+  printf 'export {}\n' > "$REPO/src/index.ts"
+  printf 'test()\n' > "$REPO/src/index.$flavour"
+  commit_tree
+  run "packed .$flavour file is denied" 1
+  grep -q "DENY  src/index.$flavour" <<< "$LAST_OUTPUT" || { echo "FAIL .$flavour path not denied" >&2; failures=$((failures + 1)); }
+done
+
 # Denylist hit inside dist
 rm -rf "$REPO/src"
 write_pkg '{"name":"fixture-pack","version":"1.0.0","files":["dist"]}'

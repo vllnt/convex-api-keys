@@ -42,7 +42,7 @@
 - The README intro is the `package.json` `description`, the same sentence as
   the `llms.txt` summary.
 - The README has a Links section (docs, release feed, package search, source,
-  community, author, sponsor) that replaces the Author section.
+  issues and npm, community, author, sponsor) that replaces the Author section.
 - README Related packages lists only packages this one uses in code; it is now
   "None.".
 - The `llms.txt` Ecosystem block links the release feed and package search.
@@ -56,9 +56,21 @@
   there are none); when `llms.txt` does not end with the Ecosystem block; and
   when a `docs/API.md` TypeScript example does not type-check. CHANGELOG and
   TSDoc examples are not type-checked.
+- `pnpm test:package` runs `scripts/test-consumer.mjs`. It packs the tarball
+  and installs it with pnpm in a clean project outside the repo. Node imports
+  and runs only `.` and reads `./package.json`. It resolves `./convex.config`
+  and `./convex.config.js` without running them, because they only run inside
+  the Convex CLI. The other entry points are type-checked: a `strict` consumer
+  imports every entry point and calls `ApiKeys` from a mutation, a query, an
+  action and an HTTP action. The test fails when an `exports` subpath is not
+  covered, and runs in CI's Test job and before every publish.
+- `pnpm typecheck:ci` type-checks `src/component/`, every test file and
+  `example/convex/`; before, a type error in a test or the example passed CI.
 
 ### Fixed
 
+- `scripts/check-package-contents.sh` also blocks `.spec.mts` and `.spec.cts`
+  files, and CI runs its test harness.
 - `package.json` `repository.url` uses the form npm expects, so publishing no
   longer prints an auto-correction warning. `pnpm test:package` fails when
   `npm pkg fix` would rewrite any field.

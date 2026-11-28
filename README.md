@@ -410,7 +410,7 @@ for development setup, testing, and PR guidelines.
 
 - Docs and changelog: [oss.vllnt.com/packages/convex-api-keys](https://oss.vllnt.com/packages/convex-api-keys) · [release feed](https://oss.vllnt.com/packages/convex-api-keys/rss.xml)
 - All @vllnt packages: [oss.vllnt.com](https://oss.vllnt.com) · [search packages and docs on index.vllnt.com](https://index.vllnt.com)
-- Source and issues: [GitHub](https://github.com/vllnt/convex-api-keys) · [issues](https://github.com/vllnt/convex-api-keys/issues)
+- Source and issues: [GitHub](https://github.com/vllnt/convex-api-keys) · [issues](https://github.com/vllnt/convex-api-keys/issues) · [npm](https://www.npmjs.com/package/@vllnt/convex-api-keys)
 - Questions and updates: [Discord](https://bntvllnt.com/discord) · [X @bntvllnt](https://x.com/bntvllnt)
 - Company and author: [vllnt.com](https://vllnt.com) · [bntvllnt.com](https://bntvllnt.com) · [GitHub @bntvllnt](https://github.com/bntvllnt) · [LinkedIn](https://linkedin.com/in/bntvllnt)
 - Sponsor: [GitHub Sponsors](https://github.com/sponsors/bntvllnt)
